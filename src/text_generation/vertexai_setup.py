@@ -46,7 +46,7 @@ def initialize_vertexai_params(location: Optional[str] = "us-central1"):
 def get_default_config() -> tuple[dict, dict]:
     default_gen_config = {
         "temperature": 0.49,
-        "max_output_tokens": 1024,
+        "max_output_tokens": 2048,
     }
     default_safety_settings = {
         generative_models.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: generative_models.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
