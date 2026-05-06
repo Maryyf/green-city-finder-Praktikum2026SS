@@ -1,0 +1,61 @@
+<!-- intro.html -->
+<body>
+<h1 style='font-size:xx-large; color: green; text-align: center'>🍀 Green City Finder 🍀</h1>
+<h3 style="text-align: center">AI Sprint 2024 submissions by Ashmi Banerjee.<sup>*</sup></h3>
+<br>
+
+<p style="text-align: justify">
+    Tourism Recommender Systems (TRS) have traditionally focused on providing personalized travel suggestions, often
+    prioritizing user preferences without considering broader sustainability goals.
+    Integrating sustainability into TRS has become essential with the increasing need to balance environmental impact,
+    local community interests, and visitor satisfaction.
+    We enhance the traditional RAG system by incorporating a sustainability metric based on a city’s popularity and
+    seasonal demand during the prompt augmentation phase.
+    This modification, called <b>Sustainability Augmented Reranking (SAR)</b>, ensures the system's recommendations align with
+    sustainability goals.
+</p>
+
+<p style="text-align: justify"><a href="https://arxiv.org/pdf/2403.18604">Sustainability score</a> for the retrieved
+    destinations is calculated based on the following parameters:
+<ul>
+    <li>Carbon footprint from the starting points to the retrieved cities using the greenest mode of travel (fly, drive,
+        train)
+    </li>
+    <li>Overall popularity of the retrieved destinations based on their aggregated Tripadvisor reviews and opinions</li>
+    <li>Seasonal footfall for the intended month of travel (if present)</li>
+</ul>
+</p>
+<p style="text-align: justify">
+    We test our implementation with Google's <b>Gemini</b> models
+    through VertexAI to generate sustainable travel recommendations.
+    We use the Wikivoyage dataset to provide city recommendations based on user queries.
+    The vector embeddings are stored and accessed in a VectorDB (LanceDB) hosted in Google Cloud.
+</p>
+
+<p style="text-align: justify">This is an extension of the following work. To <b>cite</b>, please use the following:</p>
+
+<blockquote>
+    <p> [1] <b>Enhancing sustainability in Tourism Recommender Systems,</b> <i>Ashmi Banerjee, Adithi Satish, Wolfgang
+        Wörndl</i>, In Proceedings of the 1st International Workshop on Recommender Systems for Sustainability and Social
+        Good (RecSoGood 2024), co-located with ACM RecSys 2024, Bari, Italy.
+    </p>
+</blockquote>
+<blockquote>
+    <p> [2] <b>Modeling Sustainable City Trips: Integrating CO2e Emissions, Popularity, and Seasonality into Tourism Recommender Systems,</b> <i>Ashmi Banerjee, Tunar Mahmudov, Emil Adler, Fitri Nur Aisyah, Wolfgang
+        Wörndl</i>, arXiv preprint <a href="https://arxiv.org/abs/2403.18604">arXiv:2403.18604 (2024)</a>.
+    </p>
+</blockquote>
+<br>
+<p style="text-align: justify; font-weight: bold"><sup>*</sup>Google Cloud credits are provided for this project.</p>
+<h2 style='font-size:large; color: black; text-align: left'>Instructions</h2>
+<ul>
+    <li>Select the country and city where you're located.</li>
+    <li>Enter the search query; it has to be something for which the system can recommend cities.</li>
+    <li>Click the <b>Search</b> button to find the most sustainable recommendations for your <b>starting
+        position</b>.
+    </li>
+    <li>Click the <b>Clear</b> button to clear the fields.</li>
+</ul>
+<p style="text-align: justify; color: darkred">Note that this works best if you ask it for <span
+        style="font-weight: bold; color: darkred; text-underline: darkred">city</span> recommendations.</p>
+</body>

@@ -1,0 +1,15 @@
+sentence-transformers
+gradio
+gradio_client
+python-dotenv
+google-cloud-aiplatform
+google-cloud
+vertexai==1.64.0
+huggingface_hub
+certifi==2024.7.4
+python-dotenv==1.0.1
+bitsandbytes
+accelerate
+lancedb
+anthropic
+openai

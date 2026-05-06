@@ -1,0 +1,16 @@
+MODEL_MAPPER = {
+    "Gemini-1.5-Flash": "gemini-1.5-flash-001",
+    "gemini-2.5-flash": "gemini-2.5-flash",
+    "Gemini-1.0-pro": "gemini-1.0-pro",
+    'Gemma-2-9B-it': "google/gemma-2-9b-it",
+    'Gemma-2-2B-it': "google/gemma-2-2b-it",
+    "Claude3.5-sonnet": "claude-3-5-sonnet@20240620",
+    'GPT-4': "gpt-4o-mini",
+    'Llama3': "meta-llama/Meta-Llama-3-8B",
+    'Mistral': "mistralai/Mistral-7B",
+    'Llama3.1': "meta-llama/Meta-Llama-3.1-8B",
+    'Llama3-Instruct': "meta-llama/Meta-Llama-3-8B-Instruct",
+    'Mistral-Instruct': "mistralai/Mistral-7B-Instruct-v0.1",
+    'Llama3.1-Instruct': "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    'Phi3-Instruct': "microsoft/Phi-3-small-128k-instruct",
+}
