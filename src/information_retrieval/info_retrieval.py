@@ -78,7 +78,6 @@ def get_wikivoyage_context(query, limit=10, reranking=0):
         results[doc['city']] = {key: value for key, value in doc.items() if key != 'city'}
         results[doc['city']]['listings'] = []
 
-    '''
     cities = [result['city'] for result in docs]
 
     listings = search_wikivoyage_listings(query, cities, limit, reranking)
@@ -94,8 +93,6 @@ def get_wikivoyage_context(query, limit=10, reranking=0):
         })
 
     logger.info("Returning retrieval results.")
-    '''
-    logger.info("Returning retrieval results without listings.")
     return results
 
 
