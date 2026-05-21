@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 
 import gradio as gr
 
@@ -22,7 +22,7 @@ def update_cities(selected_country, df):
     return gr.Dropdown(choices=filtered_cities, interactive=True)
 
 
-def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown]:
+def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown, Any, Any]:
     """
     Creates the main Gradio interface components and returns them.
 
@@ -31,8 +31,9 @@ def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown]
         - countries: Dropdown for selecting the country.
         - starting_point: Dropdown for selecting the starting point.
         - query: Textbox for entering the user query.
-        - sustainable: Checkbox for sustainable travel.
         - model: Dropdown for selecting the model.
+        - start_date: Optional start date for travel (gr.Date).
+        - end_date: Optional end date for travel (gr.Date).
     """
     df = get_places()
     country_names = list(df.country.unique())
@@ -58,6 +59,10 @@ def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown]
                                  "recommendation for European cities!", placeholder="Ask for your city recommendation"
                                                                                     " here!")
 
+        # Optional date inputs for travel (use Textbox for compatibility across Gradio versions)
+        start_date = gr.Textbox(label="Start date (optional)", placeholder="YYYY-MM-DD")
+        end_date = gr.Textbox(label="End date (optional)", placeholder="YYYY-MM-DD")
+
         # Checkbox for sustainable travel option
         # sustainable = gr.Checkbox(
         #     label="Sustainable",
@@ -74,5 +79,5 @@ def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown]
             info="Select your model. The model will generate sustainable recommendations based on your query."
         )
 
-    # Return all the components individually
-    return country, starting_point, query, model
+    # Return all the components individually (including optional dates)
+    return country, starting_point, query, model, start_date, end_date

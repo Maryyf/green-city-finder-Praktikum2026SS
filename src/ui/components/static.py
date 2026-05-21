@@ -42,6 +42,8 @@ def load_buttons(
         model: gr.components.Component,
         max_new_tokens: gr.components.Component,
         temperature: gr.components.Component,
+        start_date: gr.components.Component,
+        end_date: gr.components.Component,
         output: gr.components.Component,
         generate_text_fn: Callable[
             [Optional[str], str, Optional[str], Optional[bool], Optional[int], Optional[float]],
@@ -82,6 +84,8 @@ def load_buttons(
                 model,
                 max_new_tokens,
                 temperature,
+                start_date,
+                end_date,
             ],  # Input components for generation
             outputs=[output]  # Output component
         )

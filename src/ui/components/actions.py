@@ -15,6 +15,8 @@ def generate_text(
                   model: Optional[str] = "gemini-2.5-flash",
                   max_tokens: Optional[int] = 2048,
                   temp: Optional[float] = 0.49,
+                  start_date: Optional[str] = None,
+                  end_date: Optional[str] = None,
                   is_sustainable: Optional[bool] = False,
                   ):
     model_params = {
@@ -26,6 +28,8 @@ def generate_text(
         model_name=model,
         sustainability=is_sustainable,
         starting_point=starting_point,
+        start_date=start_date,
+        end_date=end_date,
         **model_params
     )
 

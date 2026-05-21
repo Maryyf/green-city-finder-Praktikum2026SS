@@ -81,6 +81,16 @@ def pipeline(starting_point: str,
     if 'sustainability' in params:
         context_params['sustainability'] = params['sustainability']
 
+    # Extract optional travel date range from params and forward to context params
+    start_date = params.get('start_date')
+    end_date = params.get('end_date')
+    if start_date:
+        context_params['start_date'] = start_date
+    if end_date:
+        context_params['end_date'] = end_date
+
+    logger.info(f"Received travel dates: start_date={start_date}, end_date={end_date}")
+
     logger.info("Retrieving context..")
     try:
         context = ir.get_context(starting_point=starting_point, query=query, **context_params)
@@ -117,7 +127,14 @@ def pipeline(starting_point: str,
         return None
 
     try:
-        model_params = {"max_tokens": params["max_tokens"], "temperature": params["temperature"]}
+        # Safely read model generation params (may be None if not provided by the UI)
+        model_params = {"max_tokens": params.get("max_tokens"), "temperature": params.get("temperature")}
+        # Forward optional travel dates so downstream components can use them
+        if start_date:
+            model_params["start_date"] = start_date
+        if end_date:
+            model_params["end_date"] = end_date
+
         post_processed_response = post_process_output(
             model_id=model_id, user_query=query,
             starting_point=starting_point,
