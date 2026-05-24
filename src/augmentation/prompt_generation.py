@@ -3,7 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
-from src.augmentation.prompts import SYSTEM_PROMPT, SUSTAINABILITY_PROMPT, USER_PROMPT
+from src.augmentation.prompts import SYSTEM_PROMPT, SUSTAINABILITY_PROMPT, USER_PROMPT, COST_PROMPT
 
 def generate_prompt(query, context, template=None):
     """
@@ -77,6 +77,21 @@ def format_context(context):
 
             text += sfairness_text
 
+        if "cost_of_living" in info:
+            cost = info["cost_of_living"]
+
+            if cost["monthly_living_cost_usd"] == "No data available":
+                cost_text = f"No cost-of-living data is available for {city}. "
+            else:
+                cost_text = (
+                    f"The estimated monthly living cost for {city} is "
+                    f"{cost['monthly_living_cost_usd']} USD. "
+                    f"Its relative cost index is {cost['cost_index']} out of 100, "
+                    f"where lower means cheaper among the available cities. "
+                )
+
+            text += cost_text
+
         text += info_text
 
         if att_flag:
@@ -108,6 +123,7 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     # what about the cities without s-fairness scores? i.e. they don't have seasonality data 
     updated_query = f"With {starting_point} as the starting point, {query}"
     prompt_with_sustainability = SUSTAINABILITY_PROMPT
+    prompt_with_cost_of_living = COST_PROMPT
 
     # format context
     formatted_context = format_context(context)
@@ -115,7 +131,10 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     if "sustainability" in params["params"] and params["params"]["sustainability"]:
         prompt = generate_prompt(updated_query, formatted_context, prompt_with_sustainability)
     else:
-        prompt = generate_prompt(updated_query, formatted_context)
+        if "cost_of_living" in params["params"] and params["params"]["cost_of_living"]:
+            prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_of_living)
+        else:
+            prompt = generate_prompt(updated_query, formatted_context)
 
     return prompt
 
@@ -124,7 +143,8 @@ def test():
     context_params = {
         'limit': 3,
         'reranking': 0, 
-        'sustainability': 0
+        'sustainability': 0,
+        'cost_of_living': 1,
     }
 
     query = "Suggest some places to visit during winter. I like hiking, nature and the mountains and I enjoy skiing " \

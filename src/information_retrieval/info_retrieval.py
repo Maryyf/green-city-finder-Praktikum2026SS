@@ -4,6 +4,7 @@ import os
 import json
 
 from src.vectordb.ingest import create_wikivoyage_docs_db_and_add_data, create_wikivoyage_listings_db_and_add_data
+from src.helpers.living_cost_loader import get_cost_scores
 
 sys.path.append("../")
 from src.vectordb.search import search_wikivoyage_listings, search_wikivoyage_docs
@@ -229,7 +230,34 @@ def get_context(starting_point: str, query: str, **params):
                 's-fairness': score['s-fairness'],
                 'transport': score['mode']
             }
+    
+    if "cost_of_living" in params and params["cost_of_living"]:
+        cost_scores = get_cost_scores(recommended_cities)
 
+        cost_by_city = {
+            item["city"]: item
+            for item in cost_scores
+        }
+
+        for city in recommended_cities:
+            if city in cost_by_city:
+                item = cost_by_city[city]
+                wikivoyage_context[city]["cost_of_living"] = {
+                    "monthly_living_cost_usd": item["monthly_living_cost_usd"],
+                    "cost_index": item["cost_index"],
+                    "cost_salary_ratio": item["cost_salary_ratio"],
+                    "breakdown": item["breakdown"],
+                    "data_quality": item["data_quality"],
+                }
+            else:
+                wikivoyage_context[city]["cost_of_living"] = {
+                    "monthly_living_cost_usd": "No data available",
+                    "cost_index": "No data available",
+                    "cost_salary_ratio": "No data available",
+                    "breakdown": {},
+                    "data_quality": "No data available",
+                }
+  
     return wikivoyage_context
 
 
@@ -250,7 +278,7 @@ def test():
             create_wikivoyage_listings_db_and_add_data()
 
             try:
-                context = get_context(query, sustainability=1)
+                context = get_context(starting_point, query, sustainability=1)
                 # cities = get_cities(context)
                 # print(cities)
             except Exception as e:
@@ -272,8 +300,79 @@ def test():
 
     return context
 
+def test2():
+    query = (
+        "Suggest some places to visit during winter. "
+        "I like hiking, nature and the mountains and I enjoy skiing in winter."
+    )
+    starting_point = "Munich"
+
+    context_params = {
+        "limit": 5,
+        "reranking": 0,
+        "sustainability": 0,
+        "cost_of_living": 1,
+    }
+
+    context = None
+
+    try:
+        context = get_context(
+            starting_point=starting_point,
+            query=query,
+            **context_params
+        )
+
+    except FileNotFoundError as e:
+        logger.warning(f"Database not found, trying to create it first: {e}")
+
+        try:
+            create_wikivoyage_docs_db_and_add_data()
+            create_wikivoyage_listings_db_and_add_data()
+
+            context = get_context(
+                starting_point=starting_point,
+                query=query,
+                **context_params
+            )
+
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logger.error(
+                f"Error after creating DB: {e}, "
+                f"{(exc_type, fname, exc_tb.tb_lineno)}"
+            )
+            context = {
+                "error": str(e),
+                "stage": "after_db_creation",
+            }
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logger.error(
+            f"Error while getting context: {e}, "
+            f"{(exc_type, fname, exc_tb.tb_lineno)}"
+        )
+        context = {
+            "error": str(e),
+            "stage": "get_context",
+        }
+
+    output_dir = os.path.join(os.getcwd(), "test_results")
+    os.makedirs(output_dir, exist_ok=True)
+
+    file_path = os.path.join(output_dir, "test_result.json")
+
+    with open(file_path, "w", encoding="utf-8") as file:
+        json.dump(context, file, ensure_ascii=False, indent=2)
+
+    logger.info(f"Saved test result to {file_path}")
+
+    return context
 
 if __name__ == "__main__":
-    context = test()
+    context = test2()
 
     print(context)

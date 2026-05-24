@@ -95,20 +95,16 @@ def read_listings():
     )
     cities = pd.read_csv(cities_csv)
 
-    # 统一清洗 city 字段
     df["city"] = df["city"].fillna("").astype(str).str.strip()
     cities["city"] = cities["city"].fillna("").astype(str).str.strip()
     cities["country"] = cities["country"].fillna("").astype(str).str.strip()
 
-    # 只保留 embeddings/cities_csv 中存在的城市
     valid_cities = set(cities["city"])
     df = df[df["city"].isin(valid_cities)].copy()
 
-    # 再补 country
     city_to_country = dict(zip(cities["city"], cities["country"]))
     df["country"] = df["city"].map(city_to_country)
 
-    # 可选：清洗其余字段
     for col in ["type", "title", "description", "country"]:
         if col in df.columns:
             df[col] = df[col].fillna("").astype(str).str.strip()

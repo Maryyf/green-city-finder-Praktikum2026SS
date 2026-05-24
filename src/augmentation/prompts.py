@@ -33,3 +33,5 @@ SUSTAINABILITY_PROMPT =\
     Your answers are correct, high-quality, and written by a domain expert. 
     If the provided context does not contain the answer, simply state, 
     "The provided context does not have the answer. """
+#TODO: add cost of living to the prompt and make sure the LLM uses it to make recommendations.
+COST_PROMPT =\

@@ -70,6 +70,7 @@ def pipeline(starting_point: str,
         'limit': 5,
         'reranking': 0,
         'sustainability': 0,
+        'cost_of_living': 1,
     }
 
     if 'limit' in params:
@@ -80,6 +81,9 @@ def pipeline(starting_point: str,
 
     if 'sustainability' in params:
         context_params['sustainability'] = params['sustainability']
+
+    if 'cost_of_living' in params:
+        context_params['cost_of_living'] = params['cost_of_living']
 
     # Extract optional travel date range from params and forward to context params
     start_date = params.get('start_date')

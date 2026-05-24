@@ -190,3 +190,5 @@ european-city-data/
 green.md
 green-city-finder-aec7003fcaf7.json
 .gradio/
+*.7z
+test_results/
