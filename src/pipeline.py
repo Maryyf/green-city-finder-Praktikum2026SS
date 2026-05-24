@@ -67,7 +67,7 @@ def pipeline(starting_point: str,
         logger.error(f"Model {model_name} not found in the model mapper.")
         model_id = MODEL_MAPPER['Gemini-1.0-pro']
     context_params = {
-        'limit': 5,
+        'limit': 10,
         'reranking': 0,
         'sustainability': 0,
         'cost_of_living': 1,
