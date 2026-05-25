@@ -74,7 +74,12 @@ def pipeline(starting_point: str,
         'reranking': 0,
         'sustainability': 0,
         'cost_of_living': 1,
+        'carbon_footprint': 0,
     }
+    
+    if 'carbon_footprint' in params:
+        context_params['carbon_footprint'] = params['carbon_footprint']
+        context_params['carbon_footprint_preference'] = params.get('carbon_footprint_preference')
 
     if 'limit' in params:
         context_params['limit'] = params['limit']

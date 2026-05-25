@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 from src.data_directories import *
 
 
-def create_chunks(city, country, text):
+def create_chunks(city, country, text, latitude=None, longitude=None):
     """
     
     Helper function that creates chunks given paragraph(s) of text based on implicit sections in the text. 
@@ -39,6 +39,8 @@ def create_chunks(city, country, text):
             chunks.append({
                 'city': city,
                 'country': country,
+                'latitude': latitude,
+                'longitude': longitude,
                 'section': section,
                 'text': chunk,
                 # 'vector': f'city: {city}, country: {country}, section: {section}, text: {chunk}' 
@@ -62,10 +64,16 @@ def read_docs():
     for file_name in os.listdir(wikivoyage_docs_dir + "cleaned/"):
         city = file_name.split(".")[0]
         # print(city)
-        country = cities[cities['city'] == city]['country'].item()
+        matched = cities[cities['city'] == city]
+        if matched.empty:
+            # skip cities not present in the master CSV
+            continue
+        country = matched['country'].item()
+        latitude = matched['lat'].item() if 'lat' in matched.columns else None
+        longitude = matched['lng'].item() if 'lng' in matched.columns else None
         with open(wikivoyage_docs_dir + "cleaned/" + file_name) as file:
             text = file.readlines()
-            chunk_df = create_chunks(city, country, text)
+            chunk_df = create_chunks(city, country, text, latitude=latitude, longitude=longitude)
             df = pd.concat([df, chunk_df])
 
     return df
@@ -104,6 +112,12 @@ def read_listings():
 
     city_to_country = dict(zip(cities["city"], cities["country"]))
     df["country"] = df["city"].map(city_to_country)
+
+    # Add latitude/longitude from master cities CSV (columns may be 'lat' and 'lng')
+    city_to_lat = dict(zip(cities["city"], cities.get("lat", pd.Series([None]*len(cities)))))
+    city_to_lng = dict(zip(cities["city"], cities.get("lng", pd.Series([None]*len(cities)))))
+    df["latitude"] = df["city"].map(city_to_lat)
+    df["longitude"] = df["city"].map(city_to_lng)
 
     for col in ["type", "title", "description", "country"]:
         if col in df.columns:

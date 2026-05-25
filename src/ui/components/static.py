@@ -12,6 +12,7 @@ def load_examples(
         query: gr.components.Component,
         model: gr.components.Component,
         cost_preference: gr.components.Component,
+        carbon_footprint_preference: gr.components.Component,
         output: gr.components.Component,
         generate_text_fn: Callable[
             [str, Optional[str], Optional[bool], Optional[int], Optional[float], Optional[str]],
@@ -23,7 +24,7 @@ def load_examples(
     example_data = EXAMPLES
     gr.Examples(
         examples=example_data,
-        inputs=[country, starting_point, query, model, cost_preference],
+        inputs=[country, starting_point, query, model, cost_preference, carbon_footprint_preference],
         fn=generate_text_fn,
         outputs=[output],
         cache_examples=True,
@@ -42,6 +43,7 @@ def load_buttons(
         query: gr.components.Component,
         model: gr.components.Component,
         cost_preference: gr.components.Component,
+        carbon_footprint_preference: gr.components.Component,
         max_new_tokens: gr.components.Component,
         temperature: gr.components.Component,
         start_date: gr.components.Component,
@@ -85,6 +87,7 @@ def load_buttons(
                 query,
                 model,
                 cost_preference,
+                carbon_footprint_preference,
                 max_new_tokens,
                 temperature,
                 start_date,
@@ -94,13 +97,13 @@ def load_buttons(
         )
         clear_btn.click(
             fn=clear_fn,  # Function to clear inputs
-            inputs=[query, model, starting_point, country, cost_preference, output],  # inputs for clearing
-            outputs=[query, model, starting_point, country, cost_preference, output]  # Clear all inputs and output
+            inputs=[query, model, starting_point, country, cost_preference, carbon_footprint_preference, output],  # inputs for clearing
+            outputs=[query, model, starting_point, country, cost_preference, carbon_footprint_preference, output]  # Clear all inputs and output
         )
         cancel_btn.click(
             fn=clear_fn,  # Function to cancel and clear inputs
-            inputs=[query, model, starting_point, country, cost_preference, output],  #inputs for cancel
-            outputs=[query, model, starting_point, country, cost_preference, output]  # Clear all inputs and output
+            inputs=[query, model, starting_point, country, cost_preference, carbon_footprint_preference, output],  #inputs for cancel
+            outputs=[query, model, starting_point, country, cost_preference, carbon_footprint_preference, output]  # Clear all inputs and output
         )
     return btns
 

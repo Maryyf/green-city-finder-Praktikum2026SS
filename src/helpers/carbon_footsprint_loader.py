@@ -26,7 +26,17 @@ def calculate_emissions(coord_a,coord_b):
     actual_distance = distance * Detour_Index[mode]
     emissions = actual_distance * Emission_factors[mode]
     return {
-        "distance_km": round(straight_distance, 1),
+        "distance_km": round(distance, 1),
         "inferred_mode": mode,
-        "estimated_co2_kg": round(total_carbon, 2)
+        "estimated_co2_kg": round(emissions, 2),
+        "carbon_category": classify_carbon_emissions(emissions)
     }
+    
+    
+def classify_carbon_emissions(emissions):
+    if emissions < 50:
+            return "Extremely Low Carbon"
+    if emissions < 200:
+            return "Normal Carbon"
+        
+    return "High Carbon"

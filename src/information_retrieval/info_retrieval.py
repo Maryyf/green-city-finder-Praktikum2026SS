@@ -5,6 +5,7 @@ import json
 
 from src.vectordb.ingest import create_wikivoyage_docs_db_and_add_data, create_wikivoyage_listings_db_and_add_data
 from src.helpers.living_cost_loader import get_cost_scores
+from src.helpers.carbon_footsprint_loader import calculate_emissions
 
 sys.path.append("../")
 from src.vectordb.search import search_wikivoyage_listings, search_wikivoyage_docs
@@ -54,6 +55,44 @@ def get_travel_months(query):
     return months_in_query
 
 
+def resolve_starting_coord(starting_point):
+    """
+    Resolve starting_point to a (latitude, longitude) tuple.
+
+    Accepted formats:
+    - dict with keys 'latitude'/'longitude' or 'lat'/'lng'
+    - tuple/list (lat, lng)
+    - city name string (will lookup in cities_csv)
+    """
+    # dict
+    if isinstance(starting_point, dict):
+        lat = starting_point.get("latitude") or starting_point.get("lat")
+        lng = starting_point.get("longitude") or starting_point.get("lng")
+        if lat is not None and lng is not None:
+            return (float(lat), float(lng))
+
+    # tuple or list
+    if isinstance(starting_point, (list, tuple)) and len(starting_point) >= 2:
+        try:
+            return (float(starting_point[0]), float(starting_point[1]))
+        except Exception:
+            pass
+
+    # string -> city name lookup
+    if isinstance(starting_point, str):
+        try:
+            import pandas as pd
+            from src.data_directories import cities_csv
+            df = pd.read_csv(cities_csv)
+            match = df[df['city'].str.lower() == starting_point.lower()]
+            if not match.empty and 'lat' in match.columns and 'lng' in match.columns:
+                return (float(match.iloc[0]['lat']), float(match.iloc[0]['lng']))
+        except Exception:
+            pass
+
+    raise ValueError('Cannot resolve starting_point to (latitude, longitude)')
+
+
 def get_wikivoyage_context(query, limit=10, reranking=0):
     """
 
@@ -77,6 +116,10 @@ def get_wikivoyage_context(query, limit=10, reranking=0):
     results = {}
     for doc in docs:
         results[doc['city']] = {key: value for key, value in doc.items() if key != 'city'}
+        # add short aliases for coordinates for easier access elsewhere
+        if 'latitude' in results[doc['city']] and 'longitude' in results[doc['city']]:
+            results[doc['city']]['lat'] = results[doc['city']]['latitude']
+            results[doc['city']]['lng'] = results[doc['city']]['longitude']
         results[doc['city']]['listings'] = []
 
     cities = [result['city'] for result in docs]
@@ -220,6 +263,12 @@ def get_context(starting_point: str, query: str, **params):
 
     wikivoyage_context = get_wikivoyage_context(query, limit, reranking)
     recommended_cities = wikivoyage_context.keys()
+    # resolve starting point into (latitude, longitude)
+    starting_coord = None
+    try:
+        starting_coord = resolve_starting_coord(starting_point)
+    except Exception as e:
+        logger.warning(f"Could not resolve starting_point to coordinates: {e}")
 
     if 'sustainability' in params and params['sustainability']:
         s_fairness_scores = get_sustainability_scores(starting_point, query, recommended_cities)
@@ -230,6 +279,7 @@ def get_context(starting_point: str, query: str, **params):
                 's-fairness': score['s-fairness'],
                 'transport': score['mode']
             }
+            
     
     if "cost_of_living" in params and params["cost_of_living"]:
         cost_scores = get_cost_scores(recommended_cities)
@@ -257,6 +307,24 @@ def get_context(starting_point: str, query: str, **params):
                     "breakdown": {},
                     "data_quality": "No data available",
                 }
+    if "carbon_footprint" in params and params["carbon_footprint"]:
+        for city in recommended_cities:
+            # wikivoyage_context stores per-city info (including latitude/longitude)
+            city_info = wikivoyage_context.get(city, {})
+            lat = city_info.get('latitude')
+            lng = city_info.get('longitude')
+            destination_coord = (lat, lng) if lat is not None and lng is not None else None
+            if starting_coord and destination_coord:
+                carbon = calculate_emissions(starting_coord, destination_coord)
+                wikivoyage_context[city]["carbon_footprint"] = carbon
+            else:
+                wikivoyage_context[city]["carbon_footprint"] = {
+                    "distance_km": "No data available",
+                    "inferred_mode": "No data available",
+                    "estimated_co2_kg": "No data available",
+                    "carbon_category": "No data available",
+                }
+         
   
     return wikivoyage_context
 

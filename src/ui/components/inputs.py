@@ -22,7 +22,7 @@ def update_cities(selected_country, df):
     return gr.Dropdown(choices=filtered_cities, interactive=True)
 
 
-def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown, gr.Dropdown, Any, Any]:
+def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown, gr.Dropdown, gr.Dropdown, Any, Any]:
     """
     Creates the main Gradio interface components and returns them.
 
@@ -66,6 +66,14 @@ def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown,
             label="Cost preference",
             info="Choose your preferred travel budget level."
         )
+        # Carbon footprint preference dropdown
+        carbon_footprint_preference = gr.Dropdown(
+            choices=["Extremely Low Carbon", "Normal Carbon", "High Carbon"],
+            value="Normal Carbon",
+            multiselect=False,
+            label="Carbon footprint preference",
+            info="Choose your preferred level of carbon footprint in your travel plans."
+        )
 
         # Optional date inputs for travel (use Textbox for compatibility across Gradio versions)
         start_date = gr.Textbox(label="Start date (optional)", placeholder="YYYY-MM-DD")
@@ -88,4 +96,4 @@ def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown,
         )
 
     # Return all the components individually (including optional dates)
-    return country, starting_point, query, model, cost_preference, start_date, end_date
+    return country, starting_point, query, model, cost_preference, carbon_footprint_preference, start_date, end_date

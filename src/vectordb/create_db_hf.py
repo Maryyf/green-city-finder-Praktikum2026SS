@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 HF_REPO = "ashmib/wikivoyage-eu-city-embeddings"
-HF_FILE = "city_abstracts_embeddings.csv"
+HF_FILE = "c"
 TABLE_NAME = "wikivoyage_documents"
 
 
@@ -48,6 +48,15 @@ def build_documents_df() -> pd.DataFrame:
     docs_df = pd.DataFrame()
     docs_df["city"] = df["city"].astype(str)
     docs_df["country"] = df["country"].astype(str)
+    # include latitude/longitude if present in the HF dataset
+    if 'lat' in df.columns:
+        docs_df['latitude'] = df['lat']
+    else:
+        docs_df['latitude'] = None
+    if 'lng' in df.columns:
+        docs_df['longitude'] = df['lng']
+    else:
+        docs_df['longitude'] = None
     docs_df["section"] = "Overview"
     docs_df["text"] = df["abstract"].fillna("").astype(str)
 

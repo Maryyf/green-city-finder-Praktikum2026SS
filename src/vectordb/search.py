@@ -71,7 +71,9 @@ def search(query: str, table_name: str, filter_condition: Optional[str] = None,
     logger.info("Found the most relevant documents.")
 
     if category == "docs":
-        return [{"city": r['city'], "country": r['country'], "section": r['section'], "text": r['text']} for r in
+        return [
+                {"city": r['city'], "country": r['country'], "section": r['section'], "text": r['text'],"latitude": r["latitude"],
+           "longitude": r["longitude"],} for r in
                 results]
     else:
         return [{"city": r['city'], "country": r['country'], "type": r['type'], "title": r['title'],

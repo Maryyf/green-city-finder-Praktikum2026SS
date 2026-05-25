@@ -18,6 +18,8 @@ class WikivoyageDocuments(LanceModel):
     """
     city: str = model.SourceField()
     country: str = model.SourceField()
+    latitude: float = model.SourceField()
+    longitude: float = model.SourceField()
     section: str = model.SourceField()
     text: str = model.SourceField()
     vector: Vector(model.ndims()) = model.VectorField()
@@ -34,4 +36,6 @@ class WikivoyageListings(LanceModel):
     title: str = model.SourceField()
     description: str = model.SourceField()
     country: str = model.SourceField()
+    latitude: float = model.SourceField()
+    longitude: float = model.SourceField()
     vector: Vector(model.ndims()) = model.VectorField()

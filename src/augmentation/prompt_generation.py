@@ -3,7 +3,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
-from src.augmentation.prompts import SYSTEM_PROMPT, SUSTAINABILITY_PROMPT, USER_PROMPT, COST_PROMPT
+from src.augmentation.prompts import (
+    SYSTEM_PROMPT,
+    SUSTAINABILITY_PROMPT,
+    USER_PROMPT,
+    COST_PROMPT,
+    CARBON_PROMPT,
+    COST_CARBON_PROMPT,
+)
 
 def generate_prompt(query, context, template=None):
     """
@@ -76,6 +83,15 @@ def format_context(context):
                 sfairness_text = f"The sustainability (or s-fairness) score for {city} in {info['sustainability']['month']} is {info['sustainability']['s-fairness']}. \n "
 
             text += sfairness_text
+        
+        if "carbon_footprint" in info:
+            carbon = info["carbon_footprint"]
+            text += (
+                f"The estimated carbon footprint from the starting point is "
+                f"{carbon['estimated_co2_kg']} kg CO2e, classified as "
+                f"{carbon['carbon_category']}. "
+                f"The inferred transport mode is {carbon['inferred_mode']}. "
+    )
 
         if "cost_of_living" in info:
             cost = info["cost_of_living"]
@@ -124,6 +140,8 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     updated_query = f"With {starting_point} as the starting point, {query}"
     prompt_with_sustainability = SUSTAINABILITY_PROMPT
     prompt_with_cost_of_living = COST_PROMPT
+    prompt_with_carbon = CARBON_PROMPT
+    prompt_with_cost_carbon = COST_CARBON_PROMPT
 
     cost_preference = params.get("params", {}).get("cost_preference", "Normal")
 
@@ -136,17 +154,30 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
         updated_query += " My cost preference is luxurious. When recommending cities, please prioritize more luxurious options based on the cost-of-living data provided, while still considering sustainability and relevance to my preferences."
     else:
         updated_query += " My cost preference is normal. When recommending cities, please consider affordability based on the cost-of-living data provided, while still balancing sustainability and relevance to my preferences without a strong bias towards either more affordable or more luxurious options."
-
+    
+    carbon_preference = params.get("params", {}).get("carbon_footprint_preference", "Normal Carbon")
+    if carbon_preference:
+        updated_query += (
+        f" My carbon footprint preference is {carbon_preference}. "
+        "When recommending cities, first consider my cost preference, then refine the recommendations based on this carbon-footprint preference."
+    )
     # format context
     formatted_context = format_context(context)
 
-    if "sustainability" in params["params"] and params["params"]["sustainability"]:
+    use_cost = params["params"].get("cost_of_living")
+    use_carbon = params["params"].get("carbon_footprint")
+    use_sustainability = params["params"].get("sustainability")
+
+    if use_cost and use_carbon:
+        prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_carbon)
+    elif use_sustainability:
         prompt = generate_prompt(updated_query, formatted_context, prompt_with_sustainability)
+    elif use_cost:
+        prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_of_living)
+    elif use_carbon:
+        prompt = generate_prompt(updated_query, formatted_context, prompt_with_carbon)
     else:
-        if "cost_of_living" in params["params"] and params["params"]["cost_of_living"]:
-            prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_of_living)
-        else:
-            prompt = generate_prompt(updated_query, formatted_context)
+        prompt = generate_prompt(updated_query, formatted_context)
 
     return prompt
 
