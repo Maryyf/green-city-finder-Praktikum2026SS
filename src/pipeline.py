@@ -58,6 +58,9 @@ def pipeline(starting_point: str,
             - limit (number of results to be retained) 
             - reranking (binary, whether to rerank results using ColBERT or not)
             - sustainability
+            - cost_of_living
+            - start_date (optional, for travel date range)
+            - end_date (optional, for travel date range)
 
     
     """
@@ -84,7 +87,9 @@ def pipeline(starting_point: str,
 
     if 'cost_of_living' in params:
         context_params['cost_of_living'] = params['cost_of_living']
-
+    context_params['cost_preference'] = params.get('cost_preference')
+    # print("DEBUG pipeline params =", params)
+    # print("DEBUG pipeline cost_preference =", params.get("cost_preference"))
     # Extract optional travel date range from params and forward to context params
     start_date = params.get('start_date')
     end_date = params.get('end_date')
@@ -102,6 +107,7 @@ def pipeline(starting_point: str,
             retrieved_cities = ir.get_cities(context)
         else:
             retrieved_cities = None
+
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         logger.error(f"Error at line {exc_tb.tb_lineno} while trying to get context: {e}")
@@ -115,6 +121,18 @@ def pipeline(starting_point: str,
             context=context,
             params=context_params
         )
+        '''
+        print("\n" + "=" * 80)
+        print("DEBUG PROMPT SENT TO LLM")
+        print("=" * 80)
+
+        for i, message in enumerate(prompt):
+            print(f"\n--- MESSAGE {i + 1}: {message.get('role', 'unknown').upper()} ---")
+            print(message.get("content", ""))
+
+        print("=" * 80 + "\n")
+        '''
+        
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         logger.error(f"Error at line {exc_tb.tb_lineno} while trying to augment prompt: {e}")

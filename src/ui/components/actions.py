@@ -13,6 +13,7 @@ def generate_text(
                   starting_point: Optional[str],
                   query_text: str,
                   model: Optional[str] = "gemini-2.5-flash",
+                  cost_preference: Optional[str] = "Normal",
                   max_tokens: Optional[int] = 2048,
                   temp: Optional[float] = 0.49,
                   start_date: Optional[str] = None,
@@ -30,6 +31,7 @@ def generate_text(
         starting_point=starting_point,
         start_date=start_date,
         end_date=end_date,
+        cost_preference=cost_preference,
         **model_params
     )
 
@@ -39,6 +41,9 @@ def generate_text(
     print("DEBUG model =", model)
     print("DEBUG max_tokens =", max_tokens)
     print("DEBUG temp =", temp)
+    print("DEBUG start_date =", start_date)
+    print("DEBUG end_date =", end_date)
+    print("DEBUG cost_preference =", cost_preference)
 
     if pipeline_response is None:
         return "Error while generating response! Please try again."

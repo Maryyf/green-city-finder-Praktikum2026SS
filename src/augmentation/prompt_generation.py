@@ -3,7 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
-from src.augmentation.prompts import SYSTEM_PROMPT, SUSTAINABILITY_PROMPT, USER_PROMPT#, COST_PROMPT
+from src.augmentation.prompts import SYSTEM_PROMPT, SUSTAINABILITY_PROMPT, USER_PROMPT, COST_PROMPT
 
 def generate_prompt(query, context, template=None):
     """
@@ -123,7 +123,19 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     # what about the cities without s-fairness scores? i.e. they don't have seasonality data 
     updated_query = f"With {starting_point} as the starting point, {query}"
     prompt_with_sustainability = SUSTAINABILITY_PROMPT
-    #prompt_with_cost_of_living = COST_PROMPT
+    prompt_with_cost_of_living = COST_PROMPT
+
+    cost_preference = params.get("params", {}).get("cost_preference", "Normal")
+
+    # print("DEBUG augment_prompt params =", params)
+    # print("DEBUG augment_prompt cost_preference =", cost_preference)
+
+    if cost_preference == 'Cheap':
+        updated_query += " My cost preference is cheap. When recommending cities, please prioritize more affordable options based on the cost-of-living data provided, while still considering sustainability and relevance to my preferences."
+    elif cost_preference == 'Luxurious':
+        updated_query += " My cost preference is luxurious. When recommending cities, please prioritize more luxurious options based on the cost-of-living data provided, while still considering sustainability and relevance to my preferences."
+    else:
+        updated_query += " My cost preference is normal. When recommending cities, please consider affordability based on the cost-of-living data provided, while still balancing sustainability and relevance to my preferences without a strong bias towards either more affordable or more luxurious options."
 
     # format context
     formatted_context = format_context(context)
@@ -131,9 +143,9 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     if "sustainability" in params["params"] and params["params"]["sustainability"]:
         prompt = generate_prompt(updated_query, formatted_context, prompt_with_sustainability)
     else:
-        #if "cost_of_living" in params["params"] and params["params"]["cost_of_living"]:
-            #prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_of_living)
-        #else:
+        if "cost_of_living" in params["params"] and params["params"]["cost_of_living"]:
+            prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_of_living)
+        else:
             prompt = generate_prompt(updated_query, formatted_context)
 
     return prompt
