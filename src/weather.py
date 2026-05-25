@@ -11,6 +11,10 @@ def will_not_rain(lat, lon, days=3, precip_thresh=0.2, start_date=None, end_date
     else:
         start = date.today() + timedelta(days=1)
         end = start + timedelta(days=days-1)
+
+    if end > date.today() + timedelta(days=16):
+        return []
+
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
