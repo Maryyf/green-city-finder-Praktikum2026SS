@@ -71,13 +71,28 @@ def search(query: str, table_name: str, filter_condition: Optional[str] = None,
     logger.info("Found the most relevant documents.")
 
     if category == "docs":
-        return [
-                {"city": r['city'], "country": r['country'], "section": r['section'], "text": r['text'],"latitude": r["latitude"],
-           "longitude": r["longitude"],} for r in
-                results]
+        out = []
+        for r in results:
+            out.append({
+                "city": r.get('city'),
+                "country": r.get('country'),
+                "section": r.get('section'),
+                "text": r.get('text'),
+                "latitude": r.get("latitude") or r.get("lat"),
+                "longitude": r.get("longitude") or r.get("lng"),
+            })
+        return out
     else:
-        return [{"city": r['city'], "country": r['country'], "type": r['type'], "title": r['title'],
-                 "description": r['description']} for r in results]
+        out = []
+        for r in results:
+            out.append({
+                "city": r.get('city'),
+                "country": r.get('country'),
+                "type": r.get('type'),
+                "title": r.get('title'),
+                "description": r.get('description'),
+            })
+        return out
 
 
 def search_wikivoyage_docs(query: str, limit: int = 10, reranking: int = 0,

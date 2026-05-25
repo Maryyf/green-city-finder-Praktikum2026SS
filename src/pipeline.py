@@ -73,8 +73,8 @@ def pipeline(starting_point: str,
         'limit': 10,
         'reranking': 0,
         'sustainability': 0,
-        'cost_of_living': 1,
-        'carbon_footprint': 0,
+        'cost_of_living':0,
+        'carbon_footprint': 1,
     }
     
     if 'carbon_footprint' in params:

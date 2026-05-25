@@ -18,7 +18,7 @@ def calculate_emissions(coord_a,coord_b):
     distance = geodesic(coord_a, coord_b).kilometers
     if distance <= 400:
         mode = "car"
-    elif 400 < distance <= 1500800:
+    elif 400 < distance <= 10000:
         mode = "train"
     else:        
         mode = "flight"

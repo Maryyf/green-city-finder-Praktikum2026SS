@@ -313,11 +313,34 @@ def get_context(starting_point: str, query: str, **params):
             city_info = wikivoyage_context.get(city, {})
             lat = city_info.get('latitude')
             lng = city_info.get('longitude')
-            destination_coord = (lat, lng) if lat is not None and lng is not None else None
+            if lat is None:
+                lat = city_info.get('lat')
+            if lng is None:
+                lng = city_info.get('lng')
+            print("DEBUG city =", city)
+            print("DEBUG city_info keys =", city_info.keys())
+            print("DEBUG destination lat/lng =", lat, lng)
+
+            destination_coord = None
+            if lat is not None and lng is not None:
+                try:
+                    destination_coord = (float(lat), float(lng))
+                except (TypeError, ValueError):
+                    destination_coord = None
+
+            if destination_coord is None:
+                try:
+                    destination_coord = resolve_starting_coord(city)
+                    print("DEBUG destination coord loaded from CSV =", destination_coord)
+                except Exception as e:
+                    print("DEBUG destination coord lookup failed =", city, e)
+
             if starting_coord and destination_coord:
                 carbon = calculate_emissions(starting_coord, destination_coord)
+                print("DEBUG carbon =", carbon)
                 wikivoyage_context[city]["carbon_footprint"] = carbon
             else:
+                print("DEBUG carbon skipped for", city)
                 wikivoyage_context[city]["carbon_footprint"] = {
                     "distance_km": "No data available",
                     "inferred_mode": "No data available",
