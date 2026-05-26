@@ -10,6 +10,7 @@ from src.augmentation.prompts import (
     COST_PROMPT,
     CARBON_PROMPT,
     COST_CARBON_PROMPT,
+    COST_TEMPORARY_EVENTS_PROMPT,
 )
 
 def generate_prompt(query, context, template=None):
@@ -91,7 +92,7 @@ def format_context(context):
                 f"{carbon['estimated_co2_kg']} kg CO2e, classified as "
                 f"{carbon['carbon_category']}. "
                 f"The inferred transport mode is {carbon['inferred_mode']}. "
-    )
+            )
 
         if "cost_of_living" in info:
             cost = info["cost_of_living"]
@@ -107,6 +108,41 @@ def format_context(context):
                 )
 
             text += cost_text
+
+        if "temporary_events" in info:
+            events = info["temporary_events"]
+
+            if events:
+                events_text = "Temporary events during the user's travel dates: "
+
+                for event in events[:3]:
+                    event_name = event.get("name") or "Unknown event"
+                    event_date = event.get("date") or "date unknown"
+                    event_time = event.get("time") or ""
+                    event_venue = event.get("venue") or "venue unknown"
+                    segment = event.get("segment")
+                    genre = event.get("genre")
+
+                    category_parts = [
+                        part for part in [segment, genre]
+                        if part and part != "Undefined"
+                    ]
+
+                    category = ""
+                    if category_parts:
+                        category = f" ({', '.join(category_parts)})"
+
+                    time_text = f" at {event_time}" if event_time else ""
+
+                    events_text += (
+                        f"{event_name} on {event_date}{time_text} "
+                        f"at {event_venue}{category}; "
+                    )
+
+                text += "\n" + events_text
+
+            else:
+                text += "\nNo temporary events were found for this city during the user's travel dates."
 
         text += info_text
 
@@ -142,6 +178,7 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     prompt_with_cost_of_living = COST_PROMPT
     prompt_with_carbon = CARBON_PROMPT
     prompt_with_cost_carbon = COST_CARBON_PROMPT
+    prompt_with_cost_temporary_events = COST_TEMPORARY_EVENTS_PROMPT
 
     cost_preference = params.get("params", {}).get("cost_preference", "Normal")
 
@@ -167,7 +204,10 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     use_cost = params["params"].get("cost_of_living")
     use_carbon = params["params"].get("carbon_footprint")
     use_sustainability = params["params"].get("sustainability")
+    use_temporary_events = params["params"].get("temporary_events")
 
+    if use_cost and use_temporary_events:
+        prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_temporary_events)
     if use_cost and use_carbon:
         prompt = generate_prompt(updated_query, formatted_context, prompt_with_cost_carbon)
     elif use_sustainability:
@@ -188,6 +228,9 @@ def test():
         'reranking': 0, 
         'sustainability': 0,
         'cost_of_living': 1,
+        'carbon_footprint': 1,
+        'temporary_events': 1,
+        'events_per_city': 3,
     }
 
     query = "Suggest some places to visit during winter. I like hiking, nature and the mountains and I enjoy skiing " \

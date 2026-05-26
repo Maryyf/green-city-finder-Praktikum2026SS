@@ -75,6 +75,8 @@ def pipeline(starting_point: str,
         'sustainability': 0,
         'cost_of_living':0,
         'carbon_footprint': 1,
+        "temporary_events": 1,
+        "events_per_city": 3,
     }
     
     if 'carbon_footprint' in params:
@@ -95,6 +97,10 @@ def pipeline(starting_point: str,
     context_params['cost_preference'] = params.get('cost_preference')
     # print("DEBUG pipeline params =", params)
     # print("DEBUG pipeline cost_preference =", params.get("cost_preference"))
+
+    if "temporary_events" in params:
+        context_params["temporary_events"] = params["temporary_events"]
+    
     # Extract optional travel date range from params and forward to context params
     start_date = params.get('start_date')
     end_date = params.get('end_date')

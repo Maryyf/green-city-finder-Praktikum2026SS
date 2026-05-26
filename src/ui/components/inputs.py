@@ -22,7 +22,7 @@ def update_cities(selected_country, df):
     return gr.Dropdown(choices=filtered_cities, interactive=True)
 
 
-def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown, gr.Dropdown, gr.Dropdown, Any, Any]:
+def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown, gr.Dropdown, gr.Checkbox, gr.Dropdown, Any, Any]:
     """
     Creates the main Gradio interface components and returns them.
 
@@ -66,6 +66,11 @@ def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown,
             label="Cost preference",
             info="Choose your preferred travel budget level."
         )
+        temporary_events = gr.Checkbox(
+            label="Include temporary events",
+            value=True,
+            info="Use Ticketmaster to include live events during your travel dates."
+        )
         # Carbon footprint preference dropdown
         carbon_footprint_preference = gr.Dropdown(
             choices=["Extremely Low Carbon", "Normal Carbon", "High Carbon"],
@@ -96,4 +101,4 @@ def main_component() -> Tuple[gr.Dropdown, gr.Dropdown, gr.Textbox, gr.Dropdown,
         )
 
     # Return all the components individually (including optional dates)
-    return country, starting_point, query, model, cost_preference, carbon_footprint_preference, start_date, end_date
+    return country, starting_point, query, model, cost_preference, temporary_events, carbon_footprint_preference, start_date, end_date

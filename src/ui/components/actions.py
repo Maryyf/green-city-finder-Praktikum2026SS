@@ -14,6 +14,7 @@ def generate_text(
                   query_text: str,
                   model: Optional[str] = "gemini-2.5-flash",
                   cost_preference: Optional[str] = "Normal",
+                  temporary_events: Optional[bool] = True,
                   carbon_footprint_preference: Optional[str] = "Normal Carbon",
                   max_tokens: Optional[int] = 2048,
                   temp: Optional[float] = 0.49,
@@ -33,6 +34,7 @@ def generate_text(
         start_date=start_date,
         end_date=end_date,
         cost_preference=cost_preference,
+        temporary_events=temporary_events,
         carbon_footprint=1 if carbon_footprint_preference else 0,
         carbon_footprint_preference=carbon_footprint_preference,
         **model_params
@@ -47,6 +49,7 @@ def generate_text(
     print("DEBUG start_date =", start_date)
     print("DEBUG end_date =", end_date)
     print("DEBUG cost_preference =", cost_preference)
+    print("DEBUG temporary_events =", temporary_events)
     print("DEBUG carbon_footprint_preference =", carbon_footprint_preference)
 
     if pipeline_response is None:
