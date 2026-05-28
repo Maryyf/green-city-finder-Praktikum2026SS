@@ -7,6 +7,7 @@ from src.vectordb.ingest import create_wikivoyage_docs_db_and_add_data, create_w
 from src.helpers.living_cost_loader import get_cost_scores
 from src.helpers.carbon_footsprint_loader import calculate_emissions
 from src.helpers.event_loader import get_events_for_cities
+from src.weather import get_rain_summary
 
 sys.path.append("../")
 from src.vectordb.search import search_wikivoyage_listings, search_wikivoyage_docs
@@ -348,6 +349,43 @@ def get_context(starting_point: str, query: str, **params):
                     "estimated_co2_kg": "No data available",
                     "carbon_category": "No data available",
                 }
+    if params.get("weather"):
+        for city in recommended_cities:
+            city_info = wikivoyage_context.get(city, {})
+
+            lat = city_info.get("latitude") or city_info.get("lat")
+            lng = city_info.get("longitude") or city_info.get("lng")
+
+            destination_coord = None
+
+            if lat is not None and lng is not None:
+                try:
+                    destination_coord = (float(lat), float(lng))
+                except (TypeError, ValueError):
+                    destination_coord = None
+
+            if destination_coord is None:
+                try:
+                    destination_coord = resolve_starting_coord(city)
+                except Exception:
+                    destination_coord = None
+
+            if destination_coord:
+                weather = get_rain_summary(
+                    lat=destination_coord[0],
+                    lon=destination_coord[1],
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date"),
+                )
+            else:
+                weather = {
+                    "available": False,
+                    "rain_risk": "unknown",
+                    "reason": "No coordinates available",
+                    "daily": [],
+                }
+
+            wikivoyage_context[city]["weather"] = weather
     if params.get("temporary_events"):
         event_results = get_events_for_cities(
             cities=recommended_cities,

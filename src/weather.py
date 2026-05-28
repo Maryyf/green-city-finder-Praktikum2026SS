@@ -57,3 +57,63 @@ weathercode：0: Clear sky
 95: Thunderstorm
 96,99: Thunderstorm with hail
 """
+def get_rain_summary(lat, lon, start_date=None, end_date=None, days=3):
+    """
+    Return a compact rain summary for one city.
+    Forecast is only available for about the next 16 days via Open-Meteo.
+    """
+    try:
+        daily = will_not_rain(
+            lat=lat,
+            lon=lon,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except Exception:
+        return {
+            "available": False,
+            "rain_risk": "unknown",
+            "reason": "Weather request failed",
+            "daily": [],
+        }
+
+    if not daily:
+        return {
+            "available": False,
+            "rain_risk": "unavailable",
+            "reason": "Forecast only supports dates within the next 16 days",
+            "daily": [],
+        }
+
+    rainy_days = sum(1 for day in daily if not day["no_rain"])
+    dry_days = sum(1 for day in daily if day["no_rain"])
+    total_precip_mm = sum(day["precip_mm"] or 0 for day in daily)
+
+    if rainy_days == 0:
+        rain_risk = "low"
+    elif rainy_days <= len(daily) / 2:
+        rain_risk = "medium"
+    else:
+        rain_risk = "high"
+    
+    rainy_dates = [
+    {
+        "date": day["date"],
+        "precip_mm": day["precip_mm"],
+        "weathercode": day["weathercode"],
+    }
+    for day in daily
+    if not day["no_rain"]
+]
+
+    return {
+        "available": True,
+        "rain_risk": rain_risk,
+        "rainy_days": rainy_days,
+        "dry_days": dry_days,
+        "total_precip_mm": round(total_precip_mm, 1),
+        "daily": daily,
+        "rainy_dates": rainy_dates,
+    }
+    

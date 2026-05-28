@@ -74,11 +74,16 @@ def pipeline(starting_point: str,
         'reranking': 0,
         'sustainability': 0,
         'cost_of_living':0,
-        'carbon_footprint': 1,
+        'carbon_footprint': 0,
         "temporary_events": 1,
-        "events_per_city": 3,
+        "events_per_city": 0,
+        "weather": 1,
     }
-    
+    if "weather" in params:
+        context_params["weather"] = params["weather"]
+
+    if "weather_preference" in params:
+        context_params["weather_preference"] = params["weather_preference"]
     if 'carbon_footprint' in params:
         context_params['carbon_footprint'] = params['carbon_footprint']
         context_params['carbon_footprint_preference'] = params.get('carbon_footprint_preference')

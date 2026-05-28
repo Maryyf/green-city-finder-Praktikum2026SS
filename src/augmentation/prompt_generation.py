@@ -145,6 +145,39 @@ def format_context(context):
                 text += "\nNo temporary events were found for this city during the user's travel dates."
 
         text += info_text
+        
+        if "weather" in info:
+            weather = info["weather"]
+
+            if weather.get("available"):
+                rainy_dates = weather.get("rainy_dates", [])
+
+                if rainy_dates:
+                    rainy_dates_text = " Rain is expected on: "
+                    rainy_dates_text += "; ".join(
+                        f"{item['date']} ({item['precip_mm']} mm)"
+                        for item in rainy_dates
+     )
+                    rainy_dates_text += "."
+                else:
+                    rainy_dates_text = " No rainy dates are expected during the travel period."
+                weather_text = (
+                    f"Weather during the user's travel dates: "
+                    f"rain risk is {weather['rain_risk']}, with "
+                    f"{weather['dry_days']} dry days and "
+                    f"{weather['rainy_days']} rainy days. "
+                    f"Total expected precipitation is "
+                    f"{weather['total_precip_mm']} mm. "
+                    f"{rainy_dates_text} "
+                )
+            else:
+                weather_text = (
+                    "Weather forecast is not available for this city "
+                    f"({weather.get('reason', 'unknown reason')}). "
+                )
+
+            text +="\n" + weather_text
+        
 
         if att_flag:
             text += f"\n{attractions_text}"
@@ -181,6 +214,7 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
     prompt_with_cost_temporary_events = COST_TEMPORARY_EVENTS_PROMPT
 
     cost_preference = params.get("params", {}).get("cost_preference", "Normal")
+    weather_preference = params.get("params", {}).get("weather_preference")
 
     # print("DEBUG augment_prompt params =", params)
     # print("DEBUG augment_prompt cost_preference =", cost_preference)
@@ -198,9 +232,15 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
         f" My carbon footprint preference is {carbon_preference}. "
         "When recommending cities, first consider my cost preference, then refine the recommendations based on this carbon-footprint preference."
     )
+    if weather_preference:
+        updated_query += (
+            f" My weather preference is {weather_preference}. "
+           "If I prefer dry weather, prioritize cities with lower rain risk when the context provides weather data. If rainy dates are available, mention the specific rainy dates in the final answer."
+        )
     # format context
     formatted_context = format_context(context)
-
+    
+    use_weather = params["params"].get("weather")
     use_cost = params["params"].get("cost_of_living")
     use_carbon = params["params"].get("carbon_footprint")
     use_sustainability = params["params"].get("sustainability")
@@ -231,6 +271,7 @@ def test():
         'carbon_footprint': 1,
         'temporary_events': 1,
         'events_per_city': 3,
+        'weather': 1,
     }
 
     query = "Suggest some places to visit during winter. I like hiking, nature and the mountains and I enjoy skiing " \

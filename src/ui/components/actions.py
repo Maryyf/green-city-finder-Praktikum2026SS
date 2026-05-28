@@ -15,6 +15,7 @@ def generate_text(
                   model: Optional[str] = "gemini-2.5-flash",
                   cost_preference: Optional[str] = "Normal",
                   temporary_events: Optional[bool] = True,
+                  weather: Optional[bool] = False,
                   carbon_footprint_preference: Optional[str] = "Normal Carbon",
                   max_tokens: Optional[int] = 2048,
                   temp: Optional[float] = 0.49,
@@ -35,6 +36,8 @@ def generate_text(
         end_date=end_date,
         cost_preference=cost_preference,
         temporary_events=temporary_events,
+        weather=weather,
+        weather_preference="Prefer dry weather" if weather else None,
         carbon_footprint=1 if carbon_footprint_preference else 0,
         carbon_footprint_preference=carbon_footprint_preference,
         **model_params
