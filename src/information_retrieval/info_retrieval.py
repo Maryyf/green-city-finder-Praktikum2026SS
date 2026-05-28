@@ -448,10 +448,14 @@ def test2():
     starting_point = "Munich"
 
     context_params = {
-        "limit": 5,
-        "reranking": 0,
-        "sustainability": 0,
-        "cost_of_living": 1,
+        'limit': 5,
+        'reranking': 0,
+        'sustainability': 0,
+        'cost_of_living':1,
+        'carbon_footprint': 1,
+        "temporary_events": 1,
+        "events_per_city": 3,
+        "weather": 1,
     }
 
     context = None
