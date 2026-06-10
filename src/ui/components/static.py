@@ -40,6 +40,7 @@ def load_examples(
 
 
 def load_buttons(
+        current_user_id: gr.components.Component,
         country: gr.components.Component,
         starting_point: gr.components.Component,
         query: gr.components.Component,
@@ -86,6 +87,7 @@ def load_buttons(
         submit_btn.click(
             fn=generate_text_fn,  # Function to generate text
             inputs=[
+                current_user_id,
                 country,
                 starting_point,
                 query,

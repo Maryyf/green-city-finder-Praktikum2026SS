@@ -207,6 +207,30 @@ def augment_prompt(query: str, starting_point: str, context: dict, **params: dic
 
     # what about the cities without s-fairness scores? i.e. they don't have seasonality data 
     updated_query = f"With {starting_point} as the starting point, {query}"
+    
+    user_profile = params.get("user_profile")
+    profile_mode = params.get("profile_mode", "soft")
+    active_profile = {}
+
+    if user_profile:
+        active_profile = {
+            key: value
+            for key, value in user_profile.items()
+            if value
+        }
+
+    if active_profile and profile_mode == "primary":
+        updated_query += (
+            f" The user did not enter a new query. "
+            f"Use the user's long-term travel profile as the main source of preferences: {active_profile}. "
+            "Recommend destinations that best match this profile."
+        )
+    elif active_profile:
+        updated_query += (
+            f" The user's long-term travel profile is {active_profile}. "
+            "Use this profile only as a soft preference. "
+            "The current query is more important than the long-term profile."
+        )
     prompt_with_sustainability = SUSTAINABILITY_PROMPT
     prompt_with_cost_of_living = COST_PROMPT
     prompt_with_carbon = CARBON_PROMPT
@@ -299,7 +323,6 @@ def test():
     )
     '''
     return without_sfairness
-
 
 if __name__ == "__main__":
     prompt = test()

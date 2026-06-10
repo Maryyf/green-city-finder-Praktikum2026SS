@@ -42,6 +42,25 @@ MODELS = {
 }
 
 
+def profile_to_query(user_profile: dict | None) -> str:
+    if not user_profile:
+        return ""
+
+    active_preferences = [
+        key.replace("_", " ")
+        for key, value in user_profile.items()
+        if value
+    ]
+
+    if not active_preferences:
+        return ""
+
+    return (
+        "Recommend European travel destinations based on these long-term "
+        f"user preferences: {', '.join(active_preferences)}."
+    )
+
+
 def pipeline(starting_point: str,
              query: str,
              model_name: str,
@@ -73,7 +92,7 @@ def pipeline(starting_point: str,
         'limit': 10,
         'reranking': 0,
         'sustainability': 0,
-        'cost_of_living':1,
+        'cost_of_living': 0,
         'carbon_footprint': 1,
         "temporary_events": 1,
         "events_per_city": 3,
@@ -116,9 +135,26 @@ def pipeline(starting_point: str,
 
     logger.info(f"Received travel dates: start_date={start_date}, end_date={end_date}")
 
+    user_profile = params.get("user_profile")
+    query = query or ""
+
+    if query.strip():
+        effective_query = query
+        profile_mode = "soft"
+    else:
+        effective_query = profile_to_query(user_profile)
+        profile_mode = "primary"
+
+    if not effective_query:
+        return "Please enter your travel preferences or log in with a profile first."
+
     logger.info("Retrieving context..")
     try:
-        context = ir.get_context(starting_point=starting_point, query=query, **context_params)
+        context = ir.get_context(
+            starting_point=starting_point,
+            query=effective_query,
+            **context_params
+        )
         if test:
             retrieved_cities = ir.get_cities(context)
         else:
@@ -132,10 +168,12 @@ def pipeline(starting_point: str,
     logger.info("Retrieved context, augmenting prompt..")
     try:
         prompt = pg.augment_prompt(
-            query=query,
+            query=effective_query,
             starting_point=starting_point,
             context=context,
-            params=context_params
+            params=context_params,
+            user_profile=user_profile,
+            profile_mode=profile_mode,
         )
         '''
         print("\n" + "=" * 80)
@@ -174,9 +212,13 @@ def pipeline(starting_point: str,
             model_params["end_date"] = end_date
 
         post_processed_response = post_process_output(
-            model_id=model_id, user_query=query,
+            model_id=model_id,
+            user_query=effective_query,
             starting_point=starting_point,
-            context=context, response=response, **model_params)
+            context=context,
+            response=response,
+            **model_params
+        )
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         logger.info(f"Error at line {exc_tb.tb_lineno} while generating response: {e}")
