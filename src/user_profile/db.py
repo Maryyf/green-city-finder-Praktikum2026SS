@@ -22,6 +22,14 @@ PROFILE_FIELDS = [
     "dry_weather",
 ]
 PASSWORD_HASH_ITERATIONS = 120_000
+PROFILE_DECAY_FACTOR = 0.8
+
+
+def profile_columns_sql(column_type: str = "REAL") -> str:
+    return ",\n                ".join(
+        f"{field} {column_type} NOT NULL DEFAULT 0"
+        for field in PROFILE_FIELDS
+    )
 
 
 def now_iso():
@@ -90,17 +98,7 @@ def init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS user_profiles (
                 user_id INTEGER PRIMARY KEY,
-                beach INTEGER NOT NULL DEFAULT 0,
-                nature INTEGER NOT NULL DEFAULT 0,
-                outdoor INTEGER NOT NULL DEFAULT 0,
-                historic INTEGER NOT NULL DEFAULT 0,
-                culture INTEGER NOT NULL DEFAULT 0,
-                nightlife INTEGER NOT NULL DEFAULT 0,
-                food INTEGER NOT NULL DEFAULT 0,
-                shopping INTEGER NOT NULL DEFAULT 0,
-                low_cost INTEGER NOT NULL DEFAULT 0,
-                low_carbon INTEGER NOT NULL DEFAULT 0,
-                dry_weather INTEGER NOT NULL DEFAULT 0,
+                """ + profile_columns_sql("REAL") + """,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -118,6 +116,50 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+
+        migrate_user_profiles_to_real(conn)
+
+
+def migrate_user_profiles_to_real(conn: sqlite3.Connection) -> None:
+    columns = conn.execute("PRAGMA table_info(user_profiles)").fetchall()
+    column_types = {
+        column["name"]: (column["type"] or "").upper()
+        for column in columns
+    }
+
+    if all(column_types.get(field) == "REAL" for field in PROFILE_FIELDS):
+        return
+
+    profile_field_list = ", ".join(PROFILE_FIELDS)
+    cast_profile_fields = ", ".join(
+        f"CAST({field} AS REAL)"
+        for field in PROFILE_FIELDS
+    )
+
+    conn.execute("""
+        CREATE TABLE user_profiles_new (
+            user_id INTEGER PRIMARY KEY,
+            """ + profile_columns_sql("REAL") + """,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
+    conn.execute(f"""
+        INSERT INTO user_profiles_new (
+            user_id,
+            {profile_field_list},
+            updated_at
+        )
+        SELECT
+            user_id,
+            {cast_profile_fields},
+            updated_at
+        FROM user_profiles
+    """)
+
+    conn.execute("DROP TABLE user_profiles")
+    conn.execute("ALTER TABLE user_profiles_new RENAME TO user_profiles")
 
 
 def row_to_dict(row):
@@ -274,26 +316,31 @@ def save_favourite(
         )
 
         return cursor.lastrowid
-    
-def update_user_profile(user_id: int, profile_update: dict) -> None:
+def update_user_profile(
+    user_id: int,
+    profile_update: dict,
+    decay_factor: float = PROFILE_DECAY_FACTOR,
+) -> None:
     init_db()
+    current_time = now_iso()
 
-    valid_updates = {
-        key: int(value)
-        for key, value in profile_update.items()
-        if key in PROFILE_FIELDS and int(value) != 0
+    updates = {
+        field: float(profile_update.get(field, 0) or 0)
+        for field in PROFILE_FIELDS
     }
 
-    if not valid_updates:
-        return
-
     assignments = [
-        f"{field} = {field} + ?"
-        for field in valid_updates
+        f"{field} = ({field} * ?) + ?"
+        for field in PROFILE_FIELDS
     ]
 
-    values = list(valid_updates.values())
-    values.append(now_iso())
+    values = []
+
+    for field in PROFILE_FIELDS:
+        values.append(decay_factor)
+        values.append(updates[field])
+
+    values.append(current_time)
     values.append(user_id)
 
     sql = f"""
@@ -304,6 +351,15 @@ def update_user_profile(user_id: int, profile_update: dict) -> None:
     """
 
     with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO user_profiles (
+                user_id,
+                updated_at
+            ) VALUES (?, ?)
+            """,
+            (user_id, current_time),
+        )
         conn.execute(sql, values)
         
 def get_user_favourites(user_id: int) -> list[dict]:

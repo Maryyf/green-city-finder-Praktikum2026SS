@@ -105,7 +105,7 @@ def show_user_profile(current_user_id: Optional[int]):
         return "Your profile is empty. Save recommendations to build it."
 
     lines = [
-        f"{key}: {value}"
+        f"{key}: {float(value):.2f}"
         for key, value in sorted(active_items.items())
     ]
 
