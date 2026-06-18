@@ -4,7 +4,8 @@ import json
 import secrets
 import sqlite3
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 DB_PATH = Path("database/user_profile.db")
 
@@ -21,8 +22,11 @@ PROFILE_FIELDS = [
     "low_carbon",
     "dry_weather",
 ]
+
 PASSWORD_HASH_ITERATIONS = 120_000
 PROFILE_DECAY_FACTOR = 0.8
+DEFAULT_AVATAR = "👤"
+SESSION_DAYS = 30
 
 
 def profile_columns_sql(column_type: str = "REAL") -> str:
@@ -35,8 +39,26 @@ def profile_columns_sql(column_type: str = "REAL") -> str:
 def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
+
 def normalize_email(email: str) -> str:
     return (email or "").strip().lower()
+
+
+def normalize_username(username: str, email: str = "") -> str:
+    username = (username or "").strip()
+
+    if not username and email:
+        username = normalize_email(email).split("@")[0]
+
+    if not username:
+        username = "Traveller"
+
+    return username[:40]
+
+
+def normalize_avatar(avatar: str) -> str:
+    avatar = (avatar or "").strip()
+    return avatar[:8] if avatar else DEFAULT_AVATAR
 
 
 def hash_password(password: str) -> str:
@@ -84,44 +106,48 @@ def get_connection():
     return conn
 
 
-def init_db():
-    with get_connection() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-        """)
+def _column_names(conn: sqlite3.Connection, table_name: str) -> set[str]:
+    columns = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {column["name"] for column in columns}
 
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS user_profiles (
-                user_id INTEGER PRIMARY KEY,
-                """ + profile_columns_sql("REAL") + """,
-                updated_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        """)
 
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS favourites (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                query TEXT NOT NULL,
-                starting_point TEXT,
-                context_params TEXT NOT NULL,
-                recommendation TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        """)
+def migrate_users_add_profile_metadata(conn: sqlite3.Connection) -> None:
+    columns = _column_names(conn, "users")
 
-        migrate_user_profiles_to_real(conn)
+    if "username" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN username TEXT")
+
+    if "avatar" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN avatar TEXT")
+
+    rows = conn.execute(
+        """
+        SELECT id, email, username, avatar
+        FROM users
+        """
+    ).fetchall()
+
+    for row in rows:
+        username = normalize_username(row["username"], row["email"])
+        avatar = normalize_avatar(row["avatar"])
+
+        conn.execute(
+            """
+            UPDATE users
+            SET username = ?,
+                avatar = ?
+            WHERE id = ?
+            """,
+            (username, avatar, row["id"]),
+        )
 
 
 def migrate_user_profiles_to_real(conn: sqlite3.Connection) -> None:
     columns = conn.execute("PRAGMA table_info(user_profiles)").fetchall()
+
+    if not columns:
+        return
+
     column_types = {
         column["name"]: (column["type"] or "").upper()
         for column in columns
@@ -162,12 +188,68 @@ def migrate_user_profiles_to_real(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE user_profiles_new RENAME TO user_profiles")
 
 
+def init_db():
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                username TEXT NOT NULL,
+                avatar TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        migrate_users_add_profile_metadata(conn)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_profiles (
+                user_id INTEGER PRIMARY KEY,
+                """ + profile_columns_sql("REAL") + """,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
+        migrate_user_profiles_to_real(conn)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS favourites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                query TEXT NOT NULL,
+                starting_point TEXT,
+                context_params TEXT NOT NULL,
+                recommendation TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
+
 def row_to_dict(row):
     if row is None:
         return None
     return dict(row)
 
-def create_user(email: str, password: str) -> int:
+
+def create_user(
+    email: str,
+    password: str,
+    username: str | None = None,
+    avatar: str | None = None,
+) -> int:
     email = normalize_email(email)
 
     if not email:
@@ -175,6 +257,9 @@ def create_user(email: str, password: str) -> int:
 
     if not password:
         raise ValueError("password cannot be empty")
+
+    username = normalize_username(username or "", email)
+    avatar = normalize_avatar(avatar or DEFAULT_AVATAR)
 
     init_db()
 
@@ -194,11 +279,13 @@ def create_user(email: str, password: str) -> int:
             """
             INSERT INTO users (
                 email,
+                username,
+                avatar,
                 password_hash,
                 created_at
-            ) VALUES (?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?)
             """,
-            (email, password_hash, created_at),
+            (email, username, avatar, password_hash, created_at),
         )
 
         user_id = cursor.lastrowid
@@ -214,7 +301,8 @@ def create_user(email: str, password: str) -> int:
         )
 
         return user_id
-    
+
+
 def authenticate_user(email: str, password: str) -> int | None:
     user = get_user_by_email(email)
 
@@ -225,6 +313,86 @@ def authenticate_user(email: str, password: str) -> int | None:
         return None
 
     return user["id"]
+
+
+def create_session(user_id: int, days: int = SESSION_DAYS) -> str:
+    if user_id is None:
+        raise ValueError("user_id cannot be empty")
+
+    init_db()
+
+    token = secrets.token_urlsafe(32)
+    created_at = datetime.now()
+    expires_at = created_at + timedelta(days=days)
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO sessions (
+                token,
+                user_id,
+                created_at,
+                expires_at
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (
+                token,
+                user_id,
+                created_at.isoformat(timespec="seconds"),
+                expires_at.isoformat(timespec="seconds"),
+            ),
+        )
+
+    return token
+
+
+def get_user_id_by_session_token(token: str | None) -> int | None:
+    token = (token or "").strip()
+
+    if not token:
+        return None
+
+    init_db()
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT token, user_id, expires_at
+            FROM sessions
+            WHERE token = ?
+            """,
+            (token,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        try:
+            expires_at = datetime.fromisoformat(row["expires_at"])
+        except ValueError:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return None
+
+        if expires_at < datetime.now():
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return None
+
+        return row["user_id"]
+
+
+def delete_session(token: str | None) -> None:
+    token = (token or "").strip()
+
+    if not token:
+        return
+
+    init_db()
+
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM sessions WHERE token = ?",
+            (token,),
+        )
 
 
 def get_user_id_by_email(email: str) -> int | None:
@@ -245,7 +413,8 @@ def get_user_id_by_email(email: str) -> int | None:
             return row["id"]
 
         return None
-    
+
+
 def get_user_by_email(email: str) -> dict | None:
     email = normalize_email(email)
 
@@ -261,7 +430,73 @@ def get_user_by_email(email: str) -> dict | None:
         ).fetchone()
 
     return row_to_dict(row)
-    
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    if user_id is None:
+        return None
+
+    init_db()
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM users
+            WHERE id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+    return row_to_dict(row)
+
+
+def get_user_public_profile(user_id: int) -> dict:
+    user = get_user_by_id(user_id)
+
+    if not user:
+        return {
+            "username": "Traveller",
+            "avatar": DEFAULT_AVATAR,
+            "email": "",
+        }
+
+    return {
+        "username": normalize_username(user.get("username"), user.get("email", "")),
+        "avatar": normalize_avatar(user.get("avatar")),
+        "email": user.get("email", ""),
+    }
+
+
+def update_user_metadata(
+    user_id: int,
+    username: str | None = None,
+    avatar: str | None = None,
+) -> None:
+    if user_id is None:
+        raise ValueError("user_id cannot be empty")
+
+    init_db()
+
+    user = get_user_by_id(user_id)
+    if not user:
+        raise ValueError("user not found")
+
+    username = normalize_username(username or user.get("username"), user.get("email", ""))
+    avatar = normalize_avatar(avatar or user.get("avatar"))
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE users
+            SET username = ?,
+                avatar = ?
+            WHERE id = ?
+            """,
+            (username, avatar, user_id),
+        )
+
+
 def get_user_profile(user_id: int) -> dict:
     init_db()
 
@@ -280,6 +515,7 @@ def get_user_profile(user_id: int) -> dict:
     profile.pop("updated_at", None)
 
     return profile
+
 
 def save_favourite(
     user_id: int,
@@ -316,6 +552,8 @@ def save_favourite(
         )
 
         return cursor.lastrowid
+
+
 def update_user_profile(
     user_id: int,
     profile_update: dict,
@@ -361,7 +599,8 @@ def update_user_profile(
             (user_id, current_time),
         )
         conn.execute(sql, values)
-        
+
+
 def get_user_favourites(user_id: int) -> list[dict]:
     init_db()
 
