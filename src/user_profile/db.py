@@ -10,32 +10,33 @@ from datetime import datetime, timedelta
 DB_PATH = Path("database/user_profile.db")
 
 PROFILE_FIELDS = [
-    "beach",
-    "nature",
-    "outdoor",
-    "historic",
-    "culture",
+    "beach_coast",
+    "mountains_hiking",
+    "nature_wildlife",
+    "winter_sports",
+    "water_sports",
+    "history_heritage",
+    "arts_museums",
+    "architecture",
+    "local_culture",
+    "food_drink",
     "nightlife",
-    "food",
-    "shopping",
-    "low_cost",
-    "low_carbon",
+    "music_festivals",
+    "shopping_markets",
+    "wellness_relaxation",
+    "major_city",
+    "small_town",
+    "hidden_gems",
+    "budget",
+    "luxury",
     "dry_weather",
+    "low_carbon",
 ]
 
 PASSWORD_HASH_ITERATIONS = 120_000
 PROFILE_DECAY_FACTOR = 0.8
 DEFAULT_AVATAR = "👤"
 SESSION_DAYS = 30
-
-
-def profile_columns_sql(column_type: str = "REAL") -> str:
-    return ",\n                ".join(
-        f"{field} {column_type} NOT NULL DEFAULT 0"
-        for field in PROFILE_FIELDS
-    )
-
-
 def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
@@ -142,52 +143,6 @@ def migrate_users_add_profile_metadata(conn: sqlite3.Connection) -> None:
         )
 
 
-def migrate_user_profiles_to_real(conn: sqlite3.Connection) -> None:
-    columns = conn.execute("PRAGMA table_info(user_profiles)").fetchall()
-
-    if not columns:
-        return
-
-    column_types = {
-        column["name"]: (column["type"] or "").upper()
-        for column in columns
-    }
-
-    if all(column_types.get(field) == "REAL" for field in PROFILE_FIELDS):
-        return
-
-    profile_field_list = ", ".join(PROFILE_FIELDS)
-    cast_profile_fields = ", ".join(
-        f"CAST({field} AS REAL)"
-        for field in PROFILE_FIELDS
-    )
-
-    conn.execute("""
-        CREATE TABLE user_profiles_new (
-            user_id INTEGER PRIMARY KEY,
-            """ + profile_columns_sql("REAL") + """,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-
-    conn.execute(f"""
-        INSERT INTO user_profiles_new (
-            user_id,
-            {profile_field_list},
-            updated_at
-        )
-        SELECT
-            user_id,
-            {cast_profile_fields},
-            updated_at
-        FROM user_profiles
-    """)
-
-    conn.execute("DROP TABLE user_profiles")
-    conn.execute("ALTER TABLE user_profiles_new RENAME TO user_profiles")
-
-
 def init_db():
     with get_connection() as conn:
         conn.execute("""
@@ -204,15 +159,15 @@ def init_db():
         migrate_users_add_profile_metadata(conn)
 
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS user_profiles (
-                user_id INTEGER PRIMARY KEY,
-                """ + profile_columns_sql("REAL") + """,
+            CREATE TABLE IF NOT EXISTS user_profile_preferences (
+                user_id INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                score REAL NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, tag),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
-
-        migrate_user_profiles_to_real(conn)
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS favourites (
@@ -288,19 +243,7 @@ def create_user(
             (email, username, avatar, password_hash, created_at),
         )
 
-        user_id = cursor.lastrowid
-
-        conn.execute(
-            """
-            INSERT INTO user_profiles (
-                user_id,
-                updated_at
-            ) VALUES (?, ?)
-            """,
-            (user_id, created_at),
-        )
-
-        return user_id
+        return cursor.lastrowid
 
 
 def authenticate_user(email: str, password: str) -> int | None:
@@ -501,18 +444,20 @@ def get_user_profile(user_id: int) -> dict:
     init_db()
 
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT * FROM user_profiles WHERE user_id = ?",
+        rows = conn.execute(
+            """
+            SELECT tag, score
+            FROM user_profile_preferences
+            WHERE user_id = ?
+            """,
             (user_id,),
-        ).fetchone()
+        ).fetchall()
 
-    profile = row_to_dict(row)
+    profile = {field: 0.0 for field in PROFILE_FIELDS}
 
-    if profile is None:
-        return {}
-
-    profile.pop("user_id", None)
-    profile.pop("updated_at", None)
+    for row in rows:
+        if row["tag"] in profile:
+            profile[row["tag"]] = float(row["score"] or 0)
 
     return profile
 
@@ -567,38 +512,45 @@ def update_user_profile(
         for field in PROFILE_FIELDS
     }
 
-    assignments = [
-        f"{field} = ({field} * ?) + ?"
-        for field in PROFILE_FIELDS
-    ]
-
-    values = []
-
-    for field in PROFILE_FIELDS:
-        values.append(decay_factor)
-        values.append(updates[field])
-
-    values.append(current_time)
-    values.append(user_id)
-
-    sql = f"""
-        UPDATE user_profiles
-        SET {", ".join(assignments)},
-            updated_at = ?
-        WHERE user_id = ?
-    """
-
     with get_connection() as conn:
+        conn.executemany(
+            """
+            INSERT OR IGNORE INTO user_profile_preferences (
+                user_id,
+                tag,
+                score,
+                updated_at
+            ) VALUES (?, ?, 0, ?)
+            """,
+            [
+                (user_id, field, current_time)
+                for field in PROFILE_FIELDS
+            ],
+        )
+
         conn.execute(
             """
-            INSERT OR IGNORE INTO user_profiles (
-                user_id,
-                updated_at
-            ) VALUES (?, ?)
+            UPDATE user_profile_preferences
+            SET score = score * ?,
+                updated_at = ?
+            WHERE user_id = ?
             """,
-            (user_id, current_time),
+            (decay_factor, current_time, user_id),
         )
-        conn.execute(sql, values)
+
+        conn.executemany(
+            """
+            UPDATE user_profile_preferences
+            SET score = score + ?,
+                updated_at = ?
+            WHERE user_id = ? AND tag = ?
+            """,
+            [
+                (score, current_time, user_id, field)
+                for field, score in updates.items()
+                if score
+            ],
+        )
 
 
 def get_user_favourites(user_id: int) -> list[dict]:

@@ -2,92 +2,110 @@
 
 ## Goal
 
-The user profile stores long-term travel preferences inferred from saved recommendations.
+The user profile stores long-term travel preferences inferred from recommendations that the user explicitly saves.
 
-The profile is updated only when the user clicks "Save".
+The current search query always has priority. The long-term profile is a soft preference when a current query exists, and becomes the main recommendation source only when the query is empty.
 
 ## Authentication
 
-Users log in with an email address and password.
+Users log in with an email address and password. Passwords are stored only as salted password hashes, never as plain text.
 
-The database must never store plain-text passwords. It should store only a password hash and the required salt or hash metadata.
+Email addresses are normalized by trimming whitespace and converting them to lowercase.
 
-Email addresses should be normalized before saving:
+## Preference Taxonomy
 
-- trim leading and trailing whitespace
-- convert to lowercase
+### Interests
 
-The first version only needs lightweight local authentication for the Gradio prototype. It does not need full production features such as password reset, email verification, session expiry, or OAuth.
-
-## Profile Fields
-
-| Field | Meaning |
+| Tag | Meaning |
 |---|---|
-| beach | User likes beaches, sea, islands, coastal cities |
-| nature | User likes nature, lakes, mountains, forests |
-| outdoor | User likes outdoor activities such as hiking, cycling, skiing |
-| historic | User likes history, castles, old towns, museums |
-| culture | User likes art, architecture, galleries, local culture |
-| nightlife | User likes bars, clubs, concerts, parties |
-| food | User likes restaurants, cafes, wine, local cuisine |
-| shopping | User likes shopping, markets, fashion |
-| low_cost | User prefers cheaper destinations |
-| low_carbon | User prefers lower-carbon travel |
-| dry_weather | User prefers dry weather or low rain risk |
+| `beach_coast` | Beaches, islands, coastal destinations and sunbathing |
+| `mountains_hiking` | Mountains, trails, hiking, trekking and climbing |
+| `nature_wildlife` | Forests, lakes, national parks, scenery and wildlife |
+| `winter_sports` | Skiing, snowboarding and other snow activities |
+| `water_sports` | Swimming, surfing, diving, kayaking and sailing |
+| `history_heritage` | Historic places, castles, old towns, ruins and heritage |
+| `arts_museums` | Museums, galleries, exhibitions and visual arts |
+| `architecture` | Architecture, cathedrals, churches and notable buildings |
+| `local_culture` | Traditions, folklore, local communities and authentic experiences |
+| `food_drink` | Restaurants, local cuisine, wine, beer and gastronomy |
+| `nightlife` | Bars, clubs and parties |
+| `music_festivals` | Concerts, live music and festivals |
+| `shopping_markets` | Shopping, local markets, boutiques and fashion |
+| `wellness_relaxation` | Spas, thermal baths, retreats and relaxing trips |
 
-## Data Format
+### Destination Style
 
-Each field is stored as an integer score.
+| Tag | Meaning |
+|---|---|
+| `major_city` | Large cities, metropolitan experiences and city breaks |
+| `small_town` | Small towns, villages, countryside and quiet destinations |
+| `hidden_gems` | Less crowded, offbeat and non-touristy destinations |
+
+### Budget, Climate and Sustainability
+
+| Tag | Meaning |
+|---|---|
+| `budget` | Affordable and low-cost travel |
+| `luxury` | Premium, high-end and luxury travel |
+| `dry_weather` | Preference for sunny or low-rain conditions |
+| `low_carbon` | Preference for low-emission and sustainable transport |
+
+Solo, couple and family travel are treated as current-trip context. They are not stored as long-term profile preferences.
+
+## Storage Model
+
+Preferences are stored in a normalized SQLite table so new tags can be introduced without adding database columns.
+
+```sql
+CREATE TABLE user_profile_preferences (
+    user_id INTEGER NOT NULL,
+    tag TEXT NOT NULL,
+    score REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, tag),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+Example data:
+
+```text
+user_id | tag                 | score
+1       | mountains_hiking    | 3.40
+1       | history_heritage    | 1.60
+1       | budget              | 2.44
+```
+
+## Profile Update Rule
+
+The profile is updated only when the user saves a recommendation.
+
+Preferences are extracted from:
+
+- the current query
+- cost, weather and carbon settings
+- the generated recommendation
+
+Before adding the newly detected preferences, every existing score is decayed:
+
+```text
+new_score = old_score * 0.8 + current_preference_score
+```
 
 Example:
 
-```json
-{
-  "beach": 2,
-  "nature": 5,
-  "outdoor": 4,
-  "historic": 1,
-  "culture": 2,
-  "nightlife": 0,
-  "food": 3,
-  "shopping": 0,
-  "low_cost": 4,
-  "low_carbon": 3,
-  "dry_weather": 1
-}
-```
-
-## Update Rule
-
-When the user saves a recommendation, extract preferences from:
-
-- query
-- starting_point
-- cost_preference
-- weather
-- carbon_footprint_preference
-- recommendation result
-
-Then increase matching profile scores.
-
-Example query:
-
 ```text
-I like beaches, nightlife and cheap cities.
+Old beach_coast score: 5.0
+No new beach preference: 5.0 * 0.8 + 0 = 4.0
+
+Old mountains_hiking score: 3.0
+New hiking preference: 3.0 * 0.8 + 1 = 3.4
 ```
 
-Example update:
+This gives more weight to recent saved preferences while retaining useful long-term history.
 
-```json
-{
-  "beach": 1,
-  "nightlife": 1,
-  "low_cost": 1
-}
-```
+## Recommendation Rule
 
-## Important Rule
-
-The current user query has higher priority than the long-term profile.
-
-The profile should only be used as a soft preference.
+- If the user enters a query, the query has priority and the profile is a soft preference.
+- If the query is empty, active profile tags are converted into the retrieval query.
+- Zero-score tags are ignored when building recommendations.
