@@ -2,6 +2,7 @@ import gradio as gr
 
 from src.ui.components.actions import (
     AVATAR_OPTIONS,
+    BOOKMARK_ROW_LIMIT,
     generate_text,
     clear,
     get_user_display,
@@ -11,9 +12,12 @@ from src.ui.components.actions import (
     update_avatar,
     update_username,
     logout_user,
+    open_bookmarks_page,
+    back_to_recommendation_page,
+    delete_bookmark,
 )
 from src.ui.components.inputs import main_component
-from src.ui.components.static import model_settings, load_buttons
+from src.ui.components.static import model_settings
 
 
 CLEAR_COOKIE_AND_SHOW_LOGIN_JS = r"""
@@ -26,12 +30,12 @@ CLEAR_COOKIE_AND_SHOW_LOGIN_JS = r"""
         const app = document.getElementById("app-shell");
 
         if (app) {
-            app.style.setProperty("display", "none", "important");
-            app.style.setProperty("height", "0", "important");
-            app.style.setProperty("min-height", "0", "important");
-            app.style.setProperty("margin", "0", "important");
-            app.style.setProperty("padding", "0", "important");
-            app.style.setProperty("overflow", "hidden", "important");
+            app.style.removeProperty("display");
+            app.style.removeProperty("height");
+            app.style.removeProperty("min-height");
+            app.style.removeProperty("margin");
+            app.style.removeProperty("padding");
+            app.style.removeProperty("overflow");
         }
 
         if (auth) {
@@ -67,9 +71,19 @@ def close_profile_panel():
     return gr.update(visible=False)
 
 
+def _flatten_bookmark_row_outputs(bookmark_rows):
+    outputs = []
+
+    for row, bookmark_html, bookmark_id_state, _delete_btn in bookmark_rows:
+        outputs.extend([row, bookmark_html, bookmark_id_state])
+
+    return outputs
+
+
 def build_recommendation_form(current_user_id, auth_panel=None, auth_status=None, session_token_store=None, intro_html: str = ""):
     """
-    Form 2: polished recommendation page with editable username, avatar and logout.
+    Form 2: recommendation page with editable username, avatar, logout
+    and a separate Bookmarks page.
     """
     with gr.Column(visible=False, elem_id="app-shell", elem_classes=["recommendation-page"]) as recommendation_panel:
         with gr.Row(elem_classes=["app-topbar"]):
@@ -107,6 +121,13 @@ def build_recommendation_form(current_user_id, auth_panel=None, auth_status=None
                     profile_header = gr.HTML()
                 with gr.Column(scale=1, min_width=70):
                     close_profile_btn = gr.Button("×", elem_id="profile-close-button")
+
+            with gr.Row(elem_classes=["bookmarks-button-row"]):
+                bookmarks_btn = gr.Button(
+                    "My bookmarks",
+                    elem_id="my-bookmarks-button",
+                    elem_classes=["my-bookmarks-button"],
+                )
 
             with gr.Column(elem_classes=["profile-editor-grid"]):
                 with gr.Column(elem_classes=["username-editor"]):
@@ -160,75 +181,199 @@ def build_recommendation_form(current_user_id, auth_panel=None, auth_status=None
                 elem_id="profile-content",
             )
 
-        with gr.Column(elem_classes=["hero-card"]):
-            gr.HTML(
-                """
-                <div class="hero-kicker">AI travel assistant</div>
-                <h2>Find your next greener city break</h2>
-                <p>
-                    Describe the kind of trip you want. The system combines city context,
-                    cost of living, weather, temporary events and carbon footprint to
-                    generate personalised recommendations.
-                </p>
-                """
-            )
+        with gr.Column(visible=True, elem_id="main-recommendation-page") as main_content:
+            with gr.Column(elem_classes=["hero-card"]):
+                gr.HTML(
+                    """
+                    <div class="hero-kicker">AI travel assistant</div>
+                    <h2>Find your next greener city break</h2>
+                    <p>
+                        Describe the kind of trip you want. The system combines city context,
+                        cost of living, weather, temporary events and carbon footprint to
+                        generate personalised recommendations.
+                    </p>
+                    """
+                )
 
-        if intro_html:
-            with gr.Accordion("About this project", open=False, elem_classes=["intro-accordion"]):
-                gr.HTML(intro_html)
+            if intro_html:
+                with gr.Accordion("About this project", open=False, elem_classes=["intro-accordion"]):
+                    gr.HTML(intro_html)
 
-        with gr.Column(elem_classes=["main-form-card"]):
-            (
-                country,
-                starting_point,
-                query,
-                model,
-                cost_preference,
-                temporary_events,
-                weather,
-                carbon_footprint_preference,
-                start_date,
-                end_date,
-            ) = main_component()
+            with gr.Column(elem_classes=["main-form-card"]):
+                (
+                    country,
+                    starting_point,
+                    query,
+                    model,
+                    cost_preference,
+                    temporary_events,
+                    weather,
+                    carbon_footprint_preference,
+                    start_date,
+                    end_date,
+                ) = main_component()
 
-        with gr.Column(elem_classes=["result-card"]):
-            output = gr.Textbox(
-                label=(
-                    "Your recommendations are sustainable with respect to the "
-                    "environment, your starting location, and month of travel."
-                ),
-                lines=6,
-            )
+            with gr.Column(elem_classes=["result-card"]):
+                output = gr.Markdown(
+                    """
+                    Enter your trip preferences and click Search to generate recommendations.
+                    """,
+                    elem_id="markdown-recommendation-output",
+                )
 
-            save_status = gr.Textbox(
-                label="Save status",
-                interactive=False,
-            )
+                save_status = gr.Textbox(
+                    label="Save status",
+                    interactive=False,
+                )
 
-            with gr.Row(elem_classes=["save-row"]):
-                save_btn = gr.Button("Save to favourites", variant="primary")
+                with gr.Row(elem_classes=["save-row"]):
+                    save_btn = gr.Button("Save to favourites", variant="primary")
 
-        with gr.Column(elem_classes=["settings-card"]):
-            max_new_tokens, temperature = model_settings()
+            with gr.Column(elem_classes=["settings-card"]):
+                max_new_tokens, temperature = model_settings()
 
-            load_buttons(
-                current_user_id,
-                country,
-                starting_point,
-                query,
-                model,
-                cost_preference,
-                temporary_events,
-                weather,
-                carbon_footprint_preference,
-                max_new_tokens,
-                temperature,
-                start_date,
-                end_date,
-                output,
-                generate_text_fn=generate_text,
-                clear_fn=clear,
-            )
+                with gr.Group(elem_classes=["search-button-group"]) as btns:
+                    with gr.Row():
+                        submit_btn = gr.Button("Search", variant="primary")
+                        clear_btn = gr.Button("Clear", variant="secondary")
+                        cancel_btn = gr.Button("Cancel", variant="stop")
+
+                submit_btn.click(
+                    fn=generate_text,
+                    inputs=[
+                        current_user_id,
+                        country,
+                        starting_point,
+                        query,
+                        model,
+                        cost_preference,
+                        temporary_events,
+                        weather,
+                        carbon_footprint_preference,
+                        max_new_tokens,
+                        temperature,
+                        start_date,
+                        end_date,
+                    ],
+                    outputs=[output],
+                )
+
+                clear_btn.click(
+                    fn=clear,
+                    inputs=[
+                        query,
+                        model,
+                        starting_point,
+                        country,
+                        cost_preference,
+                        temporary_events,
+                        weather,
+                        carbon_footprint_preference,
+                        output,
+                        save_status,
+                    ],
+                    outputs=[
+                        query,
+                        model,
+                        starting_point,
+                        country,
+                        cost_preference,
+                        temporary_events,
+                        weather,
+                        carbon_footprint_preference,
+                        output,
+                        save_status,
+                    ],
+                )
+
+                cancel_btn.click(
+                    fn=clear,
+                    inputs=[
+                        query,
+                        model,
+                        starting_point,
+                        country,
+                        cost_preference,
+                        temporary_events,
+                        weather,
+                        carbon_footprint_preference,
+                        output,
+                        save_status,
+                    ],
+                    outputs=[
+                        query,
+                        model,
+                        starting_point,
+                        country,
+                        cost_preference,
+                        temporary_events,
+                        weather,
+                        carbon_footprint_preference,
+                        output,
+                        save_status,
+                    ],
+                )
+
+        with gr.Column(visible=False, elem_id="bookmarks-page", elem_classes=["bookmarks-page"]) as bookmarks_page:
+            with gr.Row(elem_classes=["bookmarks-page-topbar"]):
+                with gr.Column(scale=7):
+                    gr.HTML(
+                        """
+                        <div class="bookmarks-page-kicker">Saved recommendations</div>
+                        <h2>My bookmarks</h2>
+                        <p>
+                            Review your saved travel recommendations. Click one item to
+                            open the full result, and click it again to collapse the result.
+                        </p>
+                        """
+                    )
+                with gr.Column(scale=2, min_width=140, elem_classes=["bookmarks-back-column"]):
+                    back_btn = gr.Button(
+                        "← Back",
+                        elem_id="bookmarks-back-button",
+                    )
+
+            with gr.Column(elem_classes=["bookmarks-page-card"]):
+                bookmarks_status = gr.HTML(
+                    """
+                    <div class="bookmark-helper">
+                        Select <strong>My bookmarks</strong> to view saved recommendations.
+                    </div>
+                    """,
+                    elem_id="bookmarks-status",
+                )
+
+                bookmark_rows = []
+
+                for index in range(BOOKMARK_ROW_LIMIT):
+                    with gr.Row(
+                        visible=False,
+                        elem_classes=["bookmark-real-row"],
+                        elem_id=f"bookmark-row-{index}",
+                    ) as bookmark_row:
+                        with gr.Column(scale=9, elem_classes=["bookmark-real-card-column"]):
+                            bookmark_html = gr.HTML(
+                                "",
+                                elem_id=f"bookmark-html-{index}",
+                            )
+                        with gr.Column(scale=1, min_width=110, elem_classes=["bookmark-real-delete-column"]):
+                            delete_btn = gr.Button(
+                                "Delete",
+                                elem_id=f"bookmark-delete-button-{index}",
+                                elem_classes=["bookmark-real-delete-button"],
+                            )
+
+                    bookmark_id_state = gr.State(None)
+                    bookmark_rows.append(
+                        (
+                            bookmark_row,
+                            bookmark_html,
+                            bookmark_id_state,
+                            delete_btn,
+                        )
+                    )
+
+        bookmark_row_outputs = _flatten_bookmark_row_outputs(bookmark_rows)
 
         profile_btn.click(
             fn=open_profile_panel,
@@ -253,6 +398,45 @@ def build_recommendation_form(current_user_id, auth_panel=None, auth_status=None
             show_progress="hidden",
             queue=False,
         )
+
+        bookmarks_btn.click(
+            fn=open_bookmarks_page,
+            inputs=[current_user_id],
+            outputs=[
+                main_content,
+                bookmarks_page,
+                profile_panel,
+                bookmarks_status,
+                *bookmark_row_outputs,
+            ],
+            show_progress="hidden",
+            queue=False,
+        )
+
+        back_btn.click(
+            fn=back_to_recommendation_page,
+            inputs=[],
+            outputs=[
+                main_content,
+                bookmarks_page,
+                bookmarks_status,
+                *bookmark_row_outputs,
+            ],
+            show_progress="hidden",
+            queue=False,
+        )
+
+        for _row, _bookmark_html, bookmark_id_state, delete_btn in bookmark_rows:
+            delete_btn.click(
+                fn=delete_bookmark,
+                inputs=[current_user_id, bookmark_id_state],
+                outputs=[
+                    bookmarks_status,
+                    *bookmark_row_outputs,
+                ],
+                show_progress="hidden",
+                queue=False,
+            )
 
         save_username_btn.click(
             fn=update_username,

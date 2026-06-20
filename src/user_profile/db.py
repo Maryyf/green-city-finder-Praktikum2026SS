@@ -553,6 +553,27 @@ def update_user_profile(
         )
 
 
+
+def delete_favourite(user_id: int, favourite_id: int) -> bool:
+    """
+    Delete one saved favourite for the current user.
+
+    The user_id condition prevents one user from deleting another user's
+    bookmark by guessing an id.
+    """
+    init_db()
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            DELETE FROM favourites
+            WHERE id = ? AND user_id = ?
+            """,
+            (favourite_id, user_id),
+        )
+
+        return cursor.rowcount > 0
+
 def get_user_favourites(user_id: int) -> list[dict]:
     init_db()
 

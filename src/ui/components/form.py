@@ -28,7 +28,7 @@ SHOW_RESTORED_PAGE_JS = r"""
         const auth = document.getElementById("auth-screen");
         const app = document.getElementById("app-shell");
 
-        if (token && app && window.getComputedStyle(app).display !== "none") {
+        if (token) {
             if (auth) {
                 auth.style.setProperty("display", "none", "important");
                 auth.style.setProperty("height", "0", "important");
@@ -36,6 +36,18 @@ SHOW_RESTORED_PAGE_JS = r"""
                 auth.style.setProperty("margin", "0", "important");
                 auth.style.setProperty("padding", "0", "important");
                 auth.style.setProperty("overflow", "hidden", "important");
+            }
+
+            if (app) {
+                app.style.removeProperty("display");
+                app.style.removeProperty("height");
+                app.style.removeProperty("min-height");
+                app.style.removeProperty("margin");
+                app.style.removeProperty("padding");
+                app.style.removeProperty("overflow");
+
+                app.style.setProperty("display", "flex", "important");
+                app.style.setProperty("flex-direction", "column", "important");
             }
 
             window.scrollTo({top: 0, left: 0, behavior: "instant"});

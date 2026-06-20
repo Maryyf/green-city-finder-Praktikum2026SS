@@ -17,6 +17,8 @@ from src.user_profile.db import (
     save_favourite,
     update_user_profile,
     update_user_metadata,
+    get_user_favourites,
+    delete_favourite,
 )
 from src.user_profile.profile_extractor import extract_profile_from_query
 
@@ -374,6 +376,310 @@ def update_avatar(current_user_id: Optional[int], new_avatar: Optional[str]):
         gr.update(value=avatar),
     )
 
+
+
+
+def render_markdown_like_html(text: str) -> str:
+    """
+    Render the saved raw Markdown-like recommendation text inside bookmark HTML.
+
+    The main recommendation output uses gr.Markdown directly. Bookmarks are
+    rendered inside HTML <details> blocks, so this helper converts the most
+    common Markdown markers into lightweight HTML without using card styling.
+    """
+    text = escape(text or "")
+
+    # Bold: **text**
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+
+    lines = text.splitlines()
+    html_lines = []
+    in_list = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        bullet_match = re.match(r"^\*\s+(.*)$", stripped)
+
+        if bullet_match:
+            if not in_list:
+                html_lines.append("<ul class='bookmark-markdown-list'>")
+                in_list = True
+
+            html_lines.append(f"<li>{bullet_match.group(1)}</li>")
+            continue
+
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+
+        if not stripped:
+            html_lines.append("<br>")
+        elif re.match(r"^\d+\.\s+", stripped):
+            html_lines.append(f"<h4 class='bookmark-markdown-heading'>{stripped}</h4>")
+        else:
+            html_lines.append(f"<p>{stripped}</p>")
+
+    if in_list:
+        html_lines.append("</ul>")
+
+    return "\n".join(html_lines)
+
+
+BOOKMARK_ROW_LIMIT = 40
+
+
+def _shorten_text(text: Optional[str], max_length: int = 72) -> str:
+    text = " ".join((text or "").split())
+
+    if len(text) <= max_length:
+        return text
+
+    return text[: max_length - 1].rstrip() + "…"
+
+
+def _render_bookmark_card(bookmark: dict) -> str:
+    bookmark_id = escape(str(bookmark.get("id", "")))
+    query = escape(bookmark.get("query") or "Untitled travel request")
+    query_short = escape(_shorten_text(bookmark.get("query") or "Untitled travel request", 92))
+    starting_point = escape(bookmark.get("starting_point") or "Not specified")
+    created_at = escape(bookmark.get("created_at") or "")
+    recommendation_html = render_markdown_like_html(bookmark.get("recommendation") or "")
+
+    context_params = bookmark.get("context_params") or {}
+    context_rows = []
+
+    for key, value in context_params.items():
+        if value is None or value == "":
+            continue
+
+        context_rows.append(
+            f"""
+            <div class="bookmark-context-row">
+                <span>{escape(str(key).replace("_", " ").title())}</span>
+                <strong>{escape(str(value))}</strong>
+            </div>
+            """
+        )
+
+    context_html = (
+        f"""
+        <div class="bookmark-context">
+            {''.join(context_rows)}
+        </div>
+        """
+        if context_rows
+        else ""
+    )
+
+    return f"""
+    <details class="bookmark-expand-card">
+        <summary class="bookmark-summary">
+            <div class="bookmark-summary-main">
+                <div class="bookmark-summary-title">
+                    Bookmark #{bookmark_id}
+                </div>
+                <div class="bookmark-summary-query">
+                    {query_short}
+                </div>
+                <div class="bookmark-summary-meta">
+                    <span>Starting point: <strong>{starting_point}</strong></span>
+                    <span>{created_at}</span>
+                </div>
+            </div>
+            <span class="bookmark-summary-icon">⌄</span>
+        </summary>
+
+        <div class="bookmark-detail-card">
+            <div class="bookmark-detail-meta">
+                <span>Saved recommendation</span>
+                <strong>{created_at}</strong>
+            </div>
+
+            <div class="bookmark-detail-title">
+                {query}
+            </div>
+
+            <div class="bookmark-detail-start">
+                Starting point: <strong>{starting_point}</strong>
+            </div>
+
+            {context_html}
+
+            <div class="bookmark-result-title">Recommendation result</div>
+            <div class="bookmark-result-body bookmark-result-markdown">
+                {recommendation_html}
+            </div>
+        </div>
+    </details>
+    """
+
+
+def _bookmark_row_updates(current_user_id: Optional[int]) -> list:
+    """
+    Return updates for fixed Gradio bookmark rows.
+
+    Each row has:
+    1. row visibility update
+    2. HTML content value
+    3. hidden state bookmark id
+
+    Real Gradio buttons are used beside each row, so Delete reliably triggers
+    Python instead of relying on onclick inside gr.HTML.
+    """
+    updates = []
+
+    if current_user_id is None:
+        favourites = []
+    else:
+        favourites = get_user_favourites(current_user_id)
+
+    visible_favourites = favourites[:BOOKMARK_ROW_LIMIT]
+
+    for bookmark in visible_favourites:
+        updates.extend(
+            [
+                gr.update(visible=True),
+                _render_bookmark_card(bookmark),
+                int(bookmark.get("id")),
+            ]
+        )
+
+    hidden_count = BOOKMARK_ROW_LIMIT - len(visible_favourites)
+
+    for _ in range(hidden_count):
+        updates.extend(
+            [
+                gr.update(visible=False),
+                "",
+                None,
+            ]
+        )
+
+    return updates
+
+
+def _bookmarks_status_html(current_user_id: Optional[int], message: str = "") -> str:
+    if message:
+        return f"""
+        <div class="bookmark-action-status">
+            {escape(message)}
+        </div>
+        """
+
+    if current_user_id is None:
+        return """
+        <div class="bookmark-empty-state">
+            Please sign in first to view your bookmarks.
+        </div>
+        """
+
+    favourites = get_user_favourites(current_user_id)
+
+    if not favourites:
+        return """
+        <div class="bookmark-empty-state">
+            You have no bookmarks yet. Generate a recommendation and click
+            <strong>Save to favourites</strong> to add one here.
+        </div>
+        """
+
+    limit_note = ""
+
+    if len(favourites) > BOOKMARK_ROW_LIMIT:
+        limit_note = f"""
+        <br>
+        Showing the latest {BOOKMARK_ROW_LIMIT} bookmarks.
+        """
+
+    return f"""
+    <div class="bookmark-helper">
+        Click any bookmark to expand its saved result. Click it again to collapse it.
+        Use the <strong>Delete</strong> button beside a bookmark to remove it from the database.
+        {limit_note}
+    </div>
+    """
+
+
+def open_bookmarks_page(current_user_id: Optional[int]):
+    """
+    Open the separate Bookmarks page.
+    """
+    return (
+        gr.update(visible=False),
+        gr.update(visible=True),
+        gr.update(visible=False),
+        _bookmarks_status_html(current_user_id),
+        *_bookmark_row_updates(current_user_id),
+    )
+
+
+def back_to_recommendation_page():
+    """
+    Return from the Bookmarks page to the recommendation page.
+    """
+    hidden_rows = []
+
+    for _ in range(BOOKMARK_ROW_LIMIT):
+        hidden_rows.extend(
+            [
+                gr.update(visible=False),
+                "",
+                None,
+            ]
+        )
+
+    return (
+        gr.update(visible=True),
+        gr.update(visible=False),
+        """
+        <div class="bookmark-helper">
+            Select <strong>My bookmarks</strong> again to view saved recommendations.
+        </div>
+        """,
+        *hidden_rows,
+    )
+
+
+def delete_bookmark(current_user_id: Optional[int], bookmark_id: Optional[int]):
+    """
+    Delete one bookmark from the database and refresh the visible bookmark rows.
+    """
+    if current_user_id is None:
+        return (
+            _bookmarks_status_html(current_user_id, "❌ Please sign in first."),
+            *_bookmark_row_updates(current_user_id),
+        )
+
+    if bookmark_id is None:
+        return (
+            _bookmarks_status_html(current_user_id, "❌ Could not identify the bookmark to delete."),
+            *_bookmark_row_updates(current_user_id),
+        )
+
+    try:
+        bookmark_id = int(bookmark_id)
+    except (TypeError, ValueError):
+        return (
+            _bookmarks_status_html(current_user_id, "❌ Could not identify the bookmark to delete."),
+            *_bookmark_row_updates(current_user_id),
+        )
+
+    deleted = delete_favourite(
+        user_id=current_user_id,
+        favourite_id=bookmark_id,
+    )
+
+    if not deleted:
+        return (
+            _bookmarks_status_html(current_user_id, "❌ Bookmark not found or already deleted."),
+            *_bookmark_row_updates(current_user_id),
+        )
+
+    return (
+        _bookmarks_status_html(current_user_id, f"✅ Bookmark #{bookmark_id} deleted."),
+        *_bookmark_row_updates(current_user_id),
+    )
 
 def save_recommendation(
     current_user_id: Optional[int],
