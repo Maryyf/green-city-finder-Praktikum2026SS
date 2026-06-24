@@ -1613,4 +1613,171 @@ body {
     margin-top: 10px;
 }
 
+/* -------------------------- Workspace tabs ----------------------------- */
+
+.workspace-tabs {
+    gap: 18px !important;
+    background: transparent !important;
+}
+
+#app-tabs > .tab-nav {
+    position: sticky;
+    top: 86px;
+    z-index: 15;
+    gap: 4px;
+    padding: 5px !important;
+    border: 1px solid rgba(18, 59, 42, 0.10);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 10px 24px rgba(18, 59, 42, 0.07);
+    backdrop-filter: blur(14px);
+}
+
+#app-tabs > .tab-nav button {
+    min-height: 38px;
+    border-radius: 10px !important;
+    color: var(--gcf-muted);
+    font-weight: 800;
+}
+
+#app-tabs > .tab-nav button.selected {
+    background: var(--gcf-mint) !important;
+    color: var(--gcf-forest) !important;
+}
+
+.tab-page-heading {
+    align-items: center;
+    padding: 18px 4px 4px !important;
+}
+
+.workspace-kicker {
+    color: var(--gcf-green);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.tab-page-heading h2 {
+    margin: 4px 0 0;
+    color: var(--gcf-ink);
+    font-size: 28px;
+    line-height: 1.15;
+}
+
+.discover-layout {
+    align-items: flex-start;
+    gap: 18px !important;
+}
+
+.discover-filter-panel,
+.discover-result-panel,
+.profile-tab-card {
+    padding: 18px !important;
+    border: 1px solid rgba(18, 59, 42, 0.09);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 12px 30px rgba(18, 59, 42, 0.06);
+}
+
+.discover-filter-panel {
+    position: sticky;
+    top: 148px;
+}
+
+.discover-result-panel {
+    min-height: 560px;
+}
+
+.filter-stack,
+.filter-accordion,
+.model-accordion {
+    gap: 12px !important;
+}
+
+.location-row,
+.date-row,
+.toggle-row,
+.query-preset-row,
+.result-actions {
+    gap: 10px !important;
+}
+
+@media (min-width: 861px) {
+    .location-row,
+    .date-row,
+    .query-preset-row,
+    .search-button-group {
+        flex-wrap: nowrap !important;
+    }
+
+    .location-row > *,
+    .date-row > *,
+    .query-preset-row > *,
+    .search-button-group > * {
+        min-width: 0 !important;
+        flex: 1 1 0 !important;
+    }
+}
+
+.query-preset-row button {
+    min-height: 34px !important;
+    padding: 0 12px !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+}
+
+.search-button-group button,
+.result-actions button {
+    min-height: 42px !important;
+    border-radius: 12px !important;
+    font-weight: 850 !important;
+}
+
+.result-actions {
+    justify-content: flex-end;
+}
+
+.save-status {
+    margin-top: 6px;
+}
+
+#saved-tab .bookmarks-page-card {
+    margin-top: 0;
+}
+
+.profile-tab-card {
+    max-width: 920px;
+    margin: 0 auto !important;
+}
+
+@media (max-width: 860px) {
+    #app-tabs > .tab-nav {
+        top: 76px;
+    }
+
+    .discover-layout {
+        flex-direction: column !important;
+    }
+
+    .discover-filter-panel,
+    .discover-result-panel {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .discover-filter-panel {
+        position: static;
+    }
+
+    .discover-result-panel {
+        min-height: 360px;
+    }
+
+    .location-row,
+    .date-row {
+        flex-direction: column !important;
+    }
+}
+
 """

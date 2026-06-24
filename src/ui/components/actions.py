@@ -255,7 +255,17 @@ def render_profile_bars(current_user_id: Optional[int]) -> str:
         for field in PROFILE_FIELDS
     }
 
-    max_score = max(numeric_profile.values()) if numeric_profile else 0
+    ranked_profile = sorted(
+        (
+            (field, score)
+            for field, score in numeric_profile.items()
+            if score > 0
+        ),
+        key=lambda item: item[1],
+        reverse=True,
+    )[:10]
+
+    max_score = ranked_profile[0][1] if ranked_profile else 0
 
     if max_score <= 0:
         return f"""
@@ -267,8 +277,7 @@ def render_profile_bars(current_user_id: Optional[int]) -> str:
 
     rows = []
 
-    for field in PROFILE_FIELDS:
-        score = numeric_profile[field]
+    for field, score in ranked_profile:
         label = PROFILE_LABELS.get(field, field.replace("_", " ").title())
         color_class = PROFILE_COLOR_CLASSES.get(field, "bar-default")
 
@@ -609,6 +618,14 @@ def open_bookmarks_page(current_user_id: Optional[int]):
         gr.update(visible=False),
         gr.update(visible=True),
         gr.update(visible=False),
+        _bookmarks_status_html(current_user_id),
+        *_bookmark_row_updates(current_user_id),
+    )
+
+
+def refresh_bookmarks_page(current_user_id: Optional[int]):
+    """Refresh bookmark content without changing page visibility."""
+    return (
         _bookmarks_status_html(current_user_id),
         *_bookmark_row_updates(current_user_id),
     )
